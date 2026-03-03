@@ -1,7 +1,7 @@
 -- ============================================================
 -- MonboVerse Hub - Wheat Incremental
 -- by NVHeadMonbo
--- v1.2 - COMPLETE with ALL Features + Fixes
+-- v1.2 - PRODUCTION READY with Junkie Key System
 -- ============================================================
 
 local Players          = game:GetService("Players")
@@ -23,20 +23,305 @@ if PlayerGui:FindFirstChild("JunkieKeySystemUI") then
 end
 
 -- ============================================================
--- KEY SYSTEM TOGGLE (SET TO false FOR DEVELOPMENT)
+-- JUNKIE KEY SYSTEM
 -- ============================================================
-local KEY_SYSTEM_ENABLED = true  -- ⚠️ Change to true to enable key system
+print("[MonboVerse Hub] Loading Junkie Key System...")
 
-if KEY_SYSTEM_ENABLED then
-    print("[MonboVerse Hub] Key system would load here...")
-    -- Key system code from original (keeping it short for now)
+local Junkie = loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
+Junkie.service    = "TimePicker"
+Junkie.identifier = "1037885"  -- ⚠️ REPLACE WITH YOUR JUNKIE IDENTIFIER
+Junkie.provider   = "YouPickTime"
+
+local options = {
+    title       = "MonboVerse Hub",
+    subtitle    = "Wheat Incremental by NVHeadMonbo",
+    description = "Please complete key verification to use the script"
+}
+
+local function saveVerifiedKey(key)  pcall(function() writefile("MVHubWI_key.txt", key) end) end
+local function loadVerifiedKey()
+    local ok, k = pcall(function() return readfile("MVHubWI_key.txt") end)
+    return ok and k or nil
+end
+local function clearSavedKey() pcall(function() delfile("MVHubWI_key.txt") end) end
+
+-- Key UI Colors
+local KC = {
+    background    = Color3.fromRGB(13,  17,  23),
+    surface       = Color3.fromRGB(22,  27,  34),
+    surfaceLight  = Color3.fromRGB(30,  36,  44),
+    primary       = Color3.fromRGB(88,  166, 255),
+    success       = Color3.fromRGB(63,  185, 80),
+    error         = Color3.fromRGB(248, 81,  73),
+    textPrimary   = Color3.fromRGB(230, 237, 243),
+    textSecondary = Color3.fromRGB(139, 148, 158),
+    border        = Color3.fromRGB(48,  54,  61),
+}
+
+-- ============================================================
+-- KEY SYSTEM UI CLASS
+-- ============================================================
+local UI = {}
+UI.__index = UI
+
+function UI.new(opts)
+    local self       = setmetatable({}, UI)
+    self.title       = opts.title       or "Key Verification"
+    self.subtitle    = opts.subtitle    or "Powered by Junkie"
+    self.description = opts.description or "Please verify your key to continue"
+    self.gui         = nil
+    self.elements    = {}
+    self._connections = {}
+    return self
 end
 
+function UI:buildUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Name           = "JunkieKeySystemUI"
+    gui.ResetOnSpawn   = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent         = LocalPlayer:WaitForChild("PlayerGui")
+    self.gui           = gui
+
+    local blur = Instance.new("BlurEffect")
+    blur.Name   = "JunkieUIBlur"
+    blur.Size   = 0
+    blur.Parent = Lighting
+    TweenService:Create(blur, TweenInfo.new(0.3), {Size = 12}):Play()
+
+    local container = Instance.new("Frame")
+    container.Name             = "Container"
+    container.Size             = UDim2.new(0, 420, 0, 280)
+    container.Position         = UDim2.new(0.5, 0, 0.5, 0)
+    container.AnchorPoint      = Vector2.new(0.5, 0.5)
+    container.BackgroundColor3 = KC.surface
+    container.BorderSizePixel  = 0
+    container.Active           = false
+    container.Parent           = gui
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 12)
+    local cStroke = Instance.new("UIStroke")
+    cStroke.Color = KC.border cStroke.Thickness = 1 cStroke.Parent = container
+
+    local header = Instance.new("Frame")
+    header.Size             = UDim2.new(1, 0, 0, 50)
+    header.BackgroundColor3 = KC.background
+    header.BorderSizePixel  = 0
+    header.Active           = false
+    header.Parent           = container
+    Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
+    local hFix = Instance.new("Frame")
+    hFix.Size = UDim2.new(1,0,0,10) hFix.Position = UDim2.new(0,0,1,-10)
+    hFix.BackgroundColor3 = KC.background hFix.BorderSizePixel = 0 hFix.Active = false hFix.Parent = header
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1,-60,0,24) titleLbl.Position = UDim2.new(0,20,0,8)
+    titleLbl.BackgroundTransparency = 1 titleLbl.Text = self.title
+    titleLbl.TextColor3 = KC.textPrimary titleLbl.TextSize = 16
+    titleLbl.Font = Enum.Font.GothamBold titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.Parent = header
+
+    local subLbl = Instance.new("TextLabel")
+    subLbl.Size = UDim2.new(1,-60,0,16) subLbl.Position = UDim2.new(0,20,0,30)
+    subLbl.BackgroundTransparency = 1 subLbl.Text = self.subtitle
+    subLbl.TextColor3 = KC.textSecondary subLbl.TextSize = 12
+    subLbl.Font = Enum.Font.Gotham subLbl.TextXAlignment = Enum.TextXAlignment.Left
+    subLbl.Parent = header
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0,30,0,30) closeBtn.Position = UDim2.new(1,-40,0.5,-15)
+    closeBtn.BackgroundColor3 = KC.surfaceLight closeBtn.BorderSizePixel = 0
+    closeBtn.Text = "×" closeBtn.TextColor3 = KC.textSecondary
+    closeBtn.TextSize = 20 closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.AutoButtonColor = true closeBtn.ZIndex = 10
+    closeBtn.Parent = header
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+    self.elements.closeButton = closeBtn
+
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(1,-40,1,-90) content.Position = UDim2.new(0,20,0,70)
+    content.BackgroundTransparency = 1 content.Active = false content.Parent = container
+
+    local desc = Instance.new("TextLabel")
+    desc.Size = UDim2.new(1,0,0,30) desc.BackgroundTransparency = 1
+    desc.Text = self.description desc.TextColor3 = KC.textSecondary
+    desc.TextSize = 13 desc.Font = Enum.Font.Gotham
+    desc.TextWrapped = true desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.Parent = content
+
+    local inputCont = Instance.new("Frame")
+    inputCont.Size = UDim2.new(1,0,0,44) inputCont.Position = UDim2.new(0,0,0,40)
+    inputCont.BackgroundColor3 = KC.background inputCont.BorderSizePixel = 0
+    inputCont.Active = false inputCont.Parent = content
+    Instance.new("UICorner", inputCont).CornerRadius = UDim.new(0, 8)
+    local iStroke = Instance.new("UIStroke")
+    iStroke.Color = KC.border iStroke.Thickness = 1 iStroke.Parent = inputCont
+
+    local keyInput = Instance.new("TextBox")
+    keyInput.Size = UDim2.new(1,-20,1,0) keyInput.Position = UDim2.new(0,10,0,0)
+    keyInput.BackgroundTransparency = 1 keyInput.PlaceholderText = "Enter your key..."
+    keyInput.PlaceholderColor3 = KC.textSecondary keyInput.Text = ""
+    keyInput.TextColor3 = KC.textPrimary keyInput.TextSize = 14
+    keyInput.Font = Enum.Font.Gotham keyInput.TextXAlignment = Enum.TextXAlignment.Left
+    keyInput.ClearTextOnFocus = false keyInput.ZIndex = 10
+    keyInput.Parent = inputCont
+    self.elements.keyInput = keyInput
+
+    local verifyBtn = Instance.new("TextButton")
+    verifyBtn.Size = UDim2.new(1,0,0,44) verifyBtn.Position = UDim2.new(0,0,0,94)
+    verifyBtn.BackgroundColor3 = KC.primary verifyBtn.BorderSizePixel = 0
+    verifyBtn.Text = "Verify Key" verifyBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    verifyBtn.TextSize = 14 verifyBtn.Font = Enum.Font.GothamBold
+    verifyBtn.AutoButtonColor = true verifyBtn.ZIndex = 10
+    verifyBtn.Parent = content
+    Instance.new("UICorner", verifyBtn).CornerRadius = UDim.new(0, 8)
+    self.elements.verifyButton = verifyBtn
+
+    local getKeyBtn = Instance.new("TextButton")
+    getKeyBtn.Size = UDim2.new(1,0,0,40) getKeyBtn.Position = UDim2.new(0,0,0,148)
+    getKeyBtn.BackgroundColor3 = KC.surfaceLight getKeyBtn.BorderSizePixel = 0
+    getKeyBtn.Text = "Get Key" getKeyBtn.TextColor3 = KC.textPrimary
+    getKeyBtn.TextSize = 14 getKeyBtn.Font = Enum.Font.GothamBold
+    getKeyBtn.AutoButtonColor = true getKeyBtn.ZIndex = 10
+    getKeyBtn.Parent = content
+    Instance.new("UICorner", getKeyBtn).CornerRadius = UDim.new(0, 8)
+    self.elements.getLinkButton = getKeyBtn
+
+    local statusLbl = Instance.new("TextLabel")
+    statusLbl.Size = UDim2.new(1,0,0,20) statusLbl.Position = UDim2.new(0,0,1,-25)
+    statusLbl.BackgroundTransparency = 1 statusLbl.Text = ""
+    statusLbl.TextColor3 = KC.textSecondary statusLbl.TextSize = 12
+    statusLbl.Font = Enum.Font.Gotham statusLbl.TextXAlignment = Enum.TextXAlignment.Center
+    statusLbl.Visible = false statusLbl.Parent = content
+    self.elements.statusLabel = statusLbl
+
+    container.Position = UDim2.new(0.5, 0, 0.5, 20)
+    TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }):Play()
+end
+
+function UI:createUI()
+    self:buildUI()
+    if not self.elements.closeButton then warn("[MonboVerse Hub] UI elements missing!") return end
+
+    table.insert(self._connections, self.elements.closeButton.MouseButton1Click:Connect(function()
+        self:close()
+    end))
+    table.insert(self._connections, self.elements.getLinkButton.MouseButton1Click:Connect(function()
+        self:handleGetLink()
+    end))
+    table.insert(self._connections, self.elements.verifyButton.MouseButton1Click:Connect(function()
+        self:handleVerifyKey()
+    end))
+    table.insert(self._connections, self.elements.keyInput.FocusLost:Connect(function(entered)
+        if entered then self:handleVerifyKey() end
+    end))
+end
+
+function UI:close()
+    getgenv().UI_CLOSED = true
+    for _, c in ipairs(self._connections) do pcall(function() c:Disconnect() end) end
+    self._connections = {}
+    if self.gui then self.gui:Destroy() end
+    local blur = Lighting:FindFirstChild("JunkieUIBlur")
+    if blur then blur:Destroy() end
+end
+
+function UI:updateStatus(msg, color, duration)
+    local lbl = self.elements.statusLabel
+    if not lbl then return end
+    lbl.Text = msg lbl.TextColor3 = color lbl.Visible = true
+    if duration and duration > 0 then
+        task.delay(duration, function()
+            if lbl and lbl.Parent then lbl.Visible = false end
+        end)
+    end
+end
+
+function UI:handleGetLink()
+    local link = Junkie.get_key_link()
+    if not link then
+        self:updateStatus("System not initialized", KC.error, 3)
+        return
+    end
+
+    local copied = false
+    if setclipboard then
+        pcall(function() setclipboard(link) copied = true end)
+    end
+    if not copied and Clipboard and Clipboard.set then
+        pcall(function() Clipboard.set(link) copied = true end)
+    end
+
+    if copied then
+        self:updateStatus("Link copied to clipboard!", KC.success, 3)
+    else
+        self:updateStatus("Could not copy — see console", KC.error, 5)
+        print("[MonboVerse Hub] Get Key link: " .. link)
+    end
+end
+
+function UI:handleVerifyKey()
+    local key = self.elements.keyInput.Text:gsub("%s+", "")
+    if key == "" then self:updateStatus("Please enter a key", KC.error, 3) return end
+
+    self.elements.verifyButton.Text = "Verifying..."
+    self:updateStatus("Verifying...", KC.primary, 0)
+
+    local result = Junkie.check_key(key)
+    if result and result.valid then
+        saveVerifiedKey(key)
+        self:updateStatus("Key verified!", KC.success, 0)
+        task.wait(1)
+        getgenv().SCRIPT_KEY = key
+        self:close()
+    else
+        self:updateStatus("Invalid key", KC.error, 3)
+        self.elements.verifyButton.Text = "Verify Key"
+    end
+end
+
+-- Run key system
+getgenv().UI_CLOSED = false
+getgenv().SCRIPT_KEY = nil
+
+local ui = UI.new(options)
+ui:createUI()
+
+local savedKey = loadVerifiedKey()
+if savedKey then
+    print("[MonboVerse Hub] Checking saved key...")
+    local result = Junkie.check_key(savedKey)
+    if result and result.valid then
+        print("[MonboVerse Hub] ✓ Saved key verified!")
+        getgenv().SCRIPT_KEY = savedKey
+        ui:close()
+    else
+        print("[MonboVerse Hub] Saved key invalid, clearing...")
+        clearSavedKey()
+    end
+end
+
+if not getgenv().SCRIPT_KEY then
+    print("[MonboVerse Hub] Waiting for key verification...")
+    while not getgenv().UI_CLOSED do task.wait(0.1) end
+end
+
+if not getgenv().SCRIPT_KEY then
+    warn("[MonboVerse Hub] ⚠ Key verification failed or cancelled")
+    return  -- STOP EXECUTION if no key
+end
+
+print("[MonboVerse Hub] ✓ Key verified! Loading main script...")
+task.wait(0.5)
+
 -- ============================================================
+-- MAIN SCRIPT STARTS HERE (Only runs if key is verified)
+-- ============================================================
+
 -- WHEAT TYPES (11 rarities) WITH INTENSITY
--- ============================================================
 local WheatTypes = {
-    {name = "BreadWheat",           enabled = false, intensity = 1},
+    {name = "BreadWheat",      enabled = false, intensity = 1},
     {name = "BrittleWheat",    enabled = false, intensity = 1},
     {name = "BlueWheat",       enabled = false, intensity = 1},
     {name = "RubyWheat",       enabled = false, intensity = 1},
@@ -98,9 +383,7 @@ MainFrame.ClipsDescendants = true
 MainFrame.Parent           = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 
--- ============================================================
--- ENHANCED RAINBOW BORDER (MORE COLORS, SMOOTH ANIMATION)
--- ============================================================
+-- ENHANCED RAINBOW BORDER
 local rainbowStroke = Instance.new("UIStroke")
 rainbowStroke.Thickness = 6
 rainbowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -109,28 +392,25 @@ rainbowStroke.Parent = MainFrame
 
 local rainbowGrad = Instance.new("UIGradient")
 rainbowGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,   0,   0)),   -- Red
-    ColorSequenceKeypoint.new(0.14, Color3.fromRGB(255, 127,   0)),   -- Orange
-    ColorSequenceKeypoint.new(0.28, Color3.fromRGB(255, 255,   0)),   -- Yellow
-    ColorSequenceKeypoint.new(0.42, Color3.fromRGB(  0, 255,   0)),   -- Green
-    ColorSequenceKeypoint.new(0.57, Color3.fromRGB(  0, 255, 255)),   -- Cyan
-    ColorSequenceKeypoint.new(0.71, Color3.fromRGB(  0,   0, 255)),   -- Blue
-    ColorSequenceKeypoint.new(0.85, Color3.fromRGB(138,  43, 226)),   -- Purple
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255,   0,   0)),   -- Back to Red
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,   0,   0)),
+    ColorSequenceKeypoint.new(0.14, Color3.fromRGB(255, 127,   0)),
+    ColorSequenceKeypoint.new(0.28, Color3.fromRGB(255, 255,   0)),
+    ColorSequenceKeypoint.new(0.42, Color3.fromRGB(  0, 255,   0)),
+    ColorSequenceKeypoint.new(0.57, Color3.fromRGB(  0, 255, 255)),
+    ColorSequenceKeypoint.new(0.71, Color3.fromRGB(  0,   0, 255)),
+    ColorSequenceKeypoint.new(0.85, Color3.fromRGB(138,  43, 226)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255,   0,   0)),
 })
 rainbowGrad.Parent = rainbowStroke
 
--- Super smooth rainbow animation with task.spawn
 task.spawn(function()
     local rot = 0
     while true do
-        rot = (rot + 4) % 360  -- Fast smooth rotation
+        rot = (rot + 4) % 360
         rainbowGrad.Rotation = rot
-        task.wait(0.03)  -- ~30fps smooth animation
+        task.wait(0.03)
     end
 end)
-
-print("🌈 Rainbow border animating with full color spectrum!")
 
 local TitleBar = Instance.new("Frame")
 TitleBar.Name             = "TitleBar"
@@ -338,9 +618,7 @@ MinimizeButton.MouseButton1Click:Connect(function()
     MinimizeButton.Text = minimized and "□" or "—"
 end)
 
--- ============================================================
 -- WHEAT COLLECT CARD WITH 3-COLUMN GRID
--- ============================================================
 local WheatCollectCard = Instance.new("Frame")
 WheatCollectCard.Name             = "WheatCollectCard"
 WheatCollectCard.Size             = UDim2.new(1, 0, 0, 340)
@@ -597,9 +875,7 @@ ToggleBtn.MouseButton1Click:Connect(function()
     ToggleBtn.TextColor3 = Config.Claimers.WheatCollect.Enabled and Color3.fromRGB(255,255,255) or C.SUBTEXT
 end)
 
--- ============================================================
 -- UPGRADE CARDS
--- ============================================================
 local function CreateToggleCard(displayName, parent, config, hasDelay)
     local Card = Instance.new("Frame")
     Card.Name             = displayName .. "Card"
@@ -710,9 +986,7 @@ SetupToggleButton(WheatMultiplierCard.ToggleButton, Config.Upgrades.WheatMultipl
 SetupToggleButton(WheatCooldownCard.ToggleButton,   Config.Upgrades.WheatCooldown)
 SetupToggleButton(WheatCapacityCard.ToggleButton,   Config.Upgrades.WheatCapacity)
 
--- ============================================================
 -- INFO PAGE
--- ============================================================
 local infoBox = Instance.new("Frame")
 infoBox.Size = UDim2.new(1,-20,0,320) infoBox.Position = UDim2.new(0,10,0,10)
 infoBox.BackgroundColor3 = Color3.fromRGB(14,26,46) infoBox.BorderSizePixel = 0
@@ -726,28 +1000,29 @@ infoText.Size = UDim2.new(1,-16,1,-16) infoText.Position = UDim2.new(0,8,0,8)
 infoText.BackgroundTransparency = 1 infoText.TextWrapped = true
 infoText.Text = [[🌾 MonboVerse Hub - Wheat Incremental v1.2
 
-✨ COMPLETE FEATURES:
-- ✅ Rainbow border (8 colors, smooth animation!)
-- ✅ 3-column grid layout (all wheat types visible)
-- ✅ Intensity sliders (1x-25x) WORKING
-- ✅ Navigation system (Claimers/Upgrades/Info)
+✨ PRODUCTION READY:
+- ✅ Junkie key system integrated
+- ✅ Rainbow border (8 colors, smooth!)
+- ✅ 3-column grid layout  
+- ✅ Intensity sliders (1x-25x)
+- ✅ Navigation system
 - ✅ Minimize button
 - ✅ Draggable title bar
 
 ⚙️ Claimers Tab:
 - Wheat Collect with 11 wheat types
-- 3x4 grid layout (compact & organized)
-- Individual intensity control per wheat
+- 3x4 grid layout (compact)
+- Individual intensity control
 - Global delay slider
 
 ⚙️ Upgrades Tab:
-- Wheat Multiplier Buy (with delay)
-- Wheat Cooldown Buy (with delay)
-- Wheat Capacity Buy (with delay)
+- Wheat Multiplier Buy
+- Wheat Cooldown Buy
+- Wheat Capacity Buy
 
-🌈 Rainbow Colors:
-Red → Orange → Yellow → Green
-→ Cyan → Blue → Purple → Red
+🔑 Key System:
+- Saves verified keys
+- Auto-loads on restart
 
 ⌨️ Keybind:  [ K ]  Toggle UI]]
 infoText.TextColor3 = C.TEXT infoText.TextSize = 9 infoText.Font = FM
@@ -770,9 +1045,7 @@ credText.TextColor3 = C.ACCENT2 credText.TextSize = 11 credText.Font = F
 credText.TextXAlignment = Enum.TextXAlignment.Center credText.TextYAlignment = Enum.TextYAlignment.Center
 credText.Parent = credBox
 
--- ============================================================
 -- K KEYBIND
--- ============================================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.K then
         Config.UIVisible = not Config.UIVisible
@@ -780,9 +1053,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ============================================================
--- HEARTBEAT (GAME LOGIC WITH FIXED INTENSITY)
--- ============================================================
+-- HEARTBEAT (GAME LOGIC WITH INTENSITY)
 RunService.Heartbeat:Connect(function()
     local t = tick()
 
@@ -797,7 +1068,7 @@ RunService.Heartbeat:Connect(function()
                     
                     for fireCount = 1, currentIntensity do
                         task.spawn(function()
-                            local success, err = pcall(function()
+                            pcall(function()
                                 local args = {
                                     "CollectResource",
                                     {
@@ -807,9 +1078,6 @@ RunService.Heartbeat:Connect(function()
                                 }
                                 ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ServerEvents"):FireServer(unpack(args))
                             end)
-                            if not success then
-                                warn("[MonboVerse Hub] Failed to collect " .. wheat.name .. ": " .. tostring(err))
-                            end
                         end)
                         if fireCount < currentIntensity then
                             task.wait(0.01)
@@ -878,15 +1146,14 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-print("[MonboVerse Hub v1.2] ✅ FULLY LOADED!")
-print("🌈 Rainbow: Red→Orange→Yellow→Green→Cyan→Blue→Purple→Red")
-print("📐 3-column grid layout")
-print("⚡ Intensity sliders working (1x-25x)")
-print("🎮 All upgrades functional")
+print("[MonboVerse Hub v1.2] ✅ PRODUCTION READY!")
+print("🔑 Key system active")
+print("🌈 Rainbow border active")
+print("⚡ All features functional")
 print("Press K to toggle UI")
 
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title    = "MonboVerse Hub v1.2 COMPLETE";
-    Text     = "ALL FEATURES + 8-color rainbow border!";
-    Duration = 6;
+    Title    = "MonboVerse Hub v1.2";
+    Text     = "PRODUCTION BUILD LOADED!";
+    Duration = 5;
 })
