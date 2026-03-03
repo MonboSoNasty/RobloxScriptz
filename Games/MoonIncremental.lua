@@ -27,9 +27,9 @@ end
 print("[Moon Incremental] Loading Junkie Key System...")
 
 local Junkie = loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
-Junkie.service    = "Cuty"
+Junkie.service    = "TimePicker"
 Junkie.identifier = "1037885"
-Junkie.provider   = "Cuty/Moon Incremental"
+Junkie.provider   = "YouPickTime"
 
 local options = {
     title       = "Moon Incremental",
