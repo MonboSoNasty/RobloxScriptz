@@ -1,0 +1,945 @@
+-- ============================================================
+--   Stats Updater v1.0
+--   by NVHeadMonbo
+-- ============================================================
+-- FEATURES:
+--   ✅ Working Junkie Key System
+--   ✅ Update Hits (custom amount)
+--   ✅ Update Iron (custom amount)
+--   ✅ Update Apples (custom amount)
+--   ✅ Update Steel (custom amount)
+--   ✅ Rainbow border animation
+--   ✅ K keybind = show/hide
+-- ============================================================
+
+local Players       = game:GetService("Players")
+local TweenService  = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService    = game:GetService("RunService")
+local Lighting      = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player  = Players.LocalPlayer
+local pgui    = player:WaitForChild("PlayerGui")
+
+-- ============================================================
+-- ANTI-STACK: destroy any previous instance
+-- ============================================================
+if pgui:FindFirstChild("NVHeadMonbo_StatsUpdater") then
+    pgui:FindFirstChild("NVHeadMonbo_StatsUpdater"):Destroy()
+end
+
+if pgui:FindFirstChild("JunkieKeySystemUI") then
+    pgui:FindFirstChild("JunkieKeySystemUI"):Destroy()
+end
+
+-- ============================================================
+-- JUNKIE KEY SYSTEM - RUNS FIRST!
+-- ============================================================
+
+print("[Aim Incremental] Loading Junkie Key System...")
+
+local Junkie = loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
+
+-- 🔧 CONFIGURE THESE VALUES:
+Junkie.service = "TimePicker"                    -- Your service name
+Junkie.identifier = "1037885"              -- Your app ID  
+Junkie.provider = "YouPickTime"          -- Your script name
+
+local options = {
+    title = "Aim Incremental",
+    subtitle = "by NVHeadMonbo",
+    description = "Please complete key verification to use the script"
+}
+
+-- Key storage functions
+local function saveVerifiedKey(key)
+    pcall(function()
+        writefile("aim_incremental_key.txt", key)
+    end)
+end
+
+local function loadVerifiedKey()
+    local success, key = pcall(function()
+        return readfile("aim_incremental_key.txt")
+    end)
+    return success and key or nil
+end
+
+local function clearSavedKey()
+    pcall(function()
+        delfile("aim_incremental_key.txt")
+    end)
+end
+
+-- Colors for Junkie UI
+local KeyColors = {
+    background = Color3.fromRGB(13, 17, 23),
+    surface = Color3.fromRGB(22, 27, 34),
+    surfaceLight = Color3.fromRGB(30, 36, 44),
+    primary = Color3.fromRGB(88, 166, 255),
+    success = Color3.fromRGB(63, 185, 80),
+    error = Color3.fromRGB(248, 81, 73),
+    textPrimary = Color3.fromRGB(230, 237, 243),
+    textSecondary = Color3.fromRGB(139, 148, 158),
+    border = Color3.fromRGB(48, 54, 61),
+}
+
+-- Junkie UI Factory
+local function loadUIFactory()
+    return function(Colors, Players, TweenService, UserInputService, Lighting)
+        return function(self)
+            local player = Players.LocalPlayer
+            local gui = Instance.new("ScreenGui")
+            gui.Name = "JunkieKeySystemUI"
+            gui.ResetOnSpawn = false
+            gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            gui.Parent = player:WaitForChild("PlayerGui")
+            
+            self.gui = gui
+            self.elements = {}
+            
+            -- Background blur
+            local blur = Instance.new("BlurEffect")
+            blur.Name = "JunkieUIBlur"
+            blur.Size = 0
+            blur.Parent = Lighting
+            
+            TweenService:Create(blur, TweenInfo.new(0.3), {Size = 12}):Play()
+            
+            -- Container
+            local container = Instance.new("Frame")
+            container.Name = "Container"
+            container.Size = UDim2.new(0, 420, 0, 280)
+            container.Position = UDim2.new(0.5, 0, 0.5, 0)
+            container.AnchorPoint = Vector2.new(0.5, 0.5)
+            container.BackgroundColor3 = Colors.surface
+            container.BorderSizePixel = 0
+            container.Parent = gui
+            
+            Instance.new("UICorner", container).CornerRadius = UDim.new(0, 12)
+            
+            local containerStroke = Instance.new("UIStroke")
+            containerStroke.Color = Colors.border
+            containerStroke.Thickness = 1
+            containerStroke.Parent = container
+            
+            -- Header
+            local header = Instance.new("Frame")
+            header.Name = "Header"
+            header.Size = UDim2.new(1, 0, 0, 50)
+            header.BackgroundColor3 = Colors.background
+            header.BorderSizePixel = 0
+            header.Parent = container
+            
+            Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
+            
+            local headerFix = Instance.new("Frame")
+            headerFix.Size = UDim2.new(1, 0, 0, 10)
+            headerFix.Position = UDim2.new(0, 0, 1, -10)
+            headerFix.BackgroundColor3 = Colors.background
+            headerFix.BorderSizePixel = 0
+            headerFix.Parent = header
+            
+            -- Title
+            local title = Instance.new("TextLabel")
+            title.Size = UDim2.new(1, -40, 0, 24)
+            title.Position = UDim2.new(0, 20, 0, 8)
+            title.BackgroundTransparency = 1
+            title.Text = self.title
+            title.TextColor3 = Colors.textPrimary
+            title.TextSize = 16
+            title.Font = Enum.Font.GothamBold
+            title.TextXAlignment = Enum.TextXAlignment.Left
+            title.Parent = header
+            
+            -- Subtitle
+            local subtitle = Instance.new("TextLabel")
+            subtitle.Size = UDim2.new(1, -40, 0, 16)
+            subtitle.Position = UDim2.new(0, 20, 0, 30)
+            subtitle.BackgroundTransparency = 1
+            subtitle.Text = self.subtitle
+            subtitle.TextColor3 = Colors.textSecondary
+            subtitle.TextSize = 12
+            subtitle.Font = Enum.Font.Gotham
+            subtitle.TextXAlignment = Enum.TextXAlignment.Left
+            subtitle.Parent = header
+            
+            -- Close button
+            local closeButton = Instance.new("TextButton")
+            closeButton.Size = UDim2.new(0, 30, 0, 30)
+            closeButton.Position = UDim2.new(1, -40, 0.5, -15)
+            closeButton.BackgroundColor3 = Colors.surfaceLight
+            closeButton.BorderSizePixel = 0
+            closeButton.Text = "×"
+            closeButton.TextColor3 = Colors.textSecondary
+            closeButton.TextSize = 20
+            closeButton.Font = Enum.Font.GothamBold
+            closeButton.Parent = header
+            
+            Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 8)
+            
+            self.elements.closeButton = closeButton
+            
+            -- Content
+            local content = Instance.new("Frame")
+            content.Size = UDim2.new(1, -40, 1, -90)
+            content.Position = UDim2.new(0, 20, 0, 70)
+            content.BackgroundTransparency = 1
+            content.Parent = container
+            
+            -- Description
+            local desc = Instance.new("TextLabel")
+            desc.Size = UDim2.new(1, 0, 0, 30)
+            desc.BackgroundTransparency = 1
+            desc.Text = self.description
+            desc.TextColor3 = Colors.textSecondary
+            desc.TextSize = 13
+            desc.Font = Enum.Font.Gotham
+            desc.TextWrapped = true
+            desc.TextXAlignment = Enum.TextXAlignment.Left
+            desc.Parent = content
+            
+            -- Key Input
+            local inputContainer = Instance.new("Frame")
+            inputContainer.Size = UDim2.new(1, 0, 0, 44)
+            inputContainer.Position = UDim2.new(0, 0, 0, 40)
+            inputContainer.BackgroundColor3 = Colors.background
+            inputContainer.BorderSizePixel = 0
+            inputContainer.Parent = content
+            
+            Instance.new("UICorner", inputContainer).CornerRadius = UDim.new(0, 8)
+            
+            local inputStroke = Instance.new("UIStroke")
+            inputStroke.Color = Colors.border
+            inputStroke.Thickness = 1
+            inputStroke.Parent = inputContainer
+            
+            local keyInput = Instance.new("TextBox")
+            keyInput.Size = UDim2.new(1, -20, 1, 0)
+            keyInput.Position = UDim2.new(0, 10, 0, 0)
+            keyInput.BackgroundTransparency = 1
+            keyInput.PlaceholderText = "Enter your key..."
+            keyInput.PlaceholderColor3 = Colors.textSecondary
+            keyInput.Text = ""
+            keyInput.TextColor3 = Colors.textPrimary
+            keyInput.TextSize = 14
+            keyInput.Font = Enum.Font.Gotham
+            keyInput.TextXAlignment = Enum.TextXAlignment.Left
+            keyInput.ClearTextOnFocus = false
+            keyInput.Parent = inputContainer
+            
+            self.elements.keyInput = keyInput
+            
+            -- Verify Button
+            local verifyButton = Instance.new("TextButton")
+            verifyButton.Size = UDim2.new(1, 0, 0, 44)
+            verifyButton.Position = UDim2.new(0, 0, 0, 94)
+            verifyButton.BackgroundColor3 = Colors.primary
+            verifyButton.BorderSizePixel = 0
+            verifyButton.Text = "Verify Key"
+            verifyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            verifyButton.TextSize = 14
+            verifyButton.Font = Enum.Font.GothamBold
+            verifyButton.Parent = content
+            
+            Instance.new("UICorner", verifyButton).CornerRadius = UDim.new(0, 8)
+            
+            self.elements.verifyButton = verifyButton
+            
+            -- Get Key Button
+            local getKeyButton = Instance.new("TextButton")
+            getKeyButton.Size = UDim2.new(1, 0, 0, 40)
+            getKeyButton.Position = UDim2.new(0, 0, 0, 148)
+            getKeyButton.BackgroundColor3 = Colors.surfaceLight
+            getKeyButton.BorderSizePixel = 0
+            getKeyButton.Text = "Get Key"
+            getKeyButton.TextColor3 = Colors.textPrimary
+            getKeyButton.TextSize = 14
+            getKeyButton.Font = Enum.Font.GothamBold
+            getKeyButton.Parent = content
+            
+            Instance.new("UICorner", getKeyButton).CornerRadius = UDim.new(0, 8)
+            
+            self.elements.getLinkButton = getKeyButton
+            
+            -- Status Label
+            local statusLabel = Instance.new("TextLabel")
+            statusLabel.Size = UDim2.new(1, 0, 0, 20)
+            statusLabel.Position = UDim2.new(0, 0, 1, -25)
+            statusLabel.BackgroundTransparency = 1
+            statusLabel.Text = ""
+            statusLabel.TextColor3 = Colors.textSecondary
+            statusLabel.TextSize = 12
+            statusLabel.Font = Enum.Font.Gotham
+            statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+            statusLabel.Visible = false
+            statusLabel.Parent = content
+            
+            self.elements.statusLabel = statusLabel
+            
+            return self.gui
+        end
+    end
+end
+
+-- UI Class
+local UI = {}
+UI.__index = UI
+
+function UI.new(options)
+    local self = setmetatable({}, UI)
+    
+    self.options = options or {}
+    self.title = self.options.title or "Key Verification"
+    self.subtitle = self.options.subtitle or "Powered by Junkie"
+    self.description = self.options.description or "Please verify your key to continue"
+    
+    self.player = Players.LocalPlayer
+    self.gui = nil
+    self._connections = {}
+    
+    return self
+end
+
+function UI:createUI()
+    local UIFactory = loadUIFactory()
+    
+    if UIFactory then
+        local uiBuilder = UIFactory(KeyColors, Players, TweenService, UserInputService, Lighting)
+        if uiBuilder then
+            uiBuilder(self)
+        end
+    end
+    
+    -- Connect buttons
+    if self.elements.closeButton then
+        table.insert(self._connections, self.elements.closeButton.MouseButton1Click:Connect(function()
+            self:close()
+        end))
+    end
+    
+    if self.elements.getLinkButton then
+        table.insert(self._connections, self.elements.getLinkButton.MouseButton1Click:Connect(function()
+            self:handleGetLink()
+        end))
+    end
+    
+    if self.elements.verifyButton then
+        table.insert(self._connections, self.elements.verifyButton.MouseButton1Click:Connect(function()
+            self:handleVerifyKey()
+        end))
+    end
+    
+    if self.elements.keyInput then
+        table.insert(self._connections, self.elements.keyInput.FocusLost:Connect(function(enterPressed)
+            if enterPressed then
+                self:handleVerifyKey()
+            end
+        end))
+    end
+    
+    return self.gui
+end
+
+function UI:close()
+    getgenv().UI_CLOSED = true
+    for _, conn in ipairs(self._connections or {}) do
+        pcall(function() conn:Disconnect() end)
+    end
+    self._connections = {}
+    if self.gui then self.gui:Destroy() end
+    
+    local blur = Lighting:FindFirstChild("JunkieUIBlur")
+    if blur then blur:Destroy() end
+    
+    return getgenv().SCRIPT_KEY
+end
+
+function UI:updateStatus(message, color, duration)
+    if not self.elements or not self.elements.statusLabel then return end
+    
+    local statusLabel = self.elements.statusLabel
+    statusLabel.Text = message
+    statusLabel.TextColor3 = color
+    statusLabel.Visible = true
+    
+    if duration and duration > 0 then
+        task.delay(duration, function()
+            if statusLabel then
+                statusLabel.Visible = false
+            end
+        end)
+    end
+end
+
+function UI:handleGetLink()
+    local secureGetKeyLink = Junkie.get_key_link()
+    if not secureGetKeyLink then
+        self:updateStatus("System not initialized", KeyColors.error, 3)
+        return
+    end
+    
+    if setclipboard then
+        setclipboard(secureGetKeyLink)
+        self:updateStatus("Link copied to clipboard!", KeyColors.success, 3)
+    else
+        self:updateStatus("Get link: " .. secureGetKeyLink, KeyColors.primary, 10)
+    end
+end
+
+function UI:handleVerifyKey()
+    local key = self.elements.keyInput.Text:gsub("%s+", "")
+    
+    if key == "" then
+        self:updateStatus("Please enter a key", KeyColors.error, 3)
+        return
+    end
+    
+    self.elements.verifyButton.Text = "Verifying..."
+    self:updateStatus("Verifying...", KeyColors.primary, 0)
+    
+    local result = Junkie.check_key(key)
+    
+    if result and result.valid then
+        saveVerifiedKey(key)
+        self:updateStatus("Key verified!", KeyColors.success, 0)
+        
+        task.wait(1)
+        getgenv().SCRIPT_KEY = key
+        self:close()
+        return
+    else
+        self:updateStatus("Invalid key", KeyColors.error, 3)
+        self.elements.verifyButton.Text = "Verify Key"
+    end
+end
+
+-- Initialize globals
+getgenv().UI_CLOSED = false
+getgenv().SCRIPT_KEY = nil
+
+-- Create UI
+local ui = UI.new(options)
+ui:createUI()
+
+-- Check for saved key
+local savedKey = loadVerifiedKey()
+if savedKey then
+    print("[Stats Updater] Checking saved key...")
+    local result = Junkie.check_key(savedKey)
+    if result and result.valid then
+        print("[Stats Updater] ✓ Saved key verified!")
+        getgenv().SCRIPT_KEY = savedKey
+        ui:close()
+    else
+        print("[Stats Updater] Saved key invalid, clearing...")
+        clearSavedKey()
+    end
+end
+
+-- Wait for verification if no saved key
+if not getgenv().SCRIPT_KEY then
+    print("[Stats Updater] Waiting for key verification...")
+    while not getgenv().UI_CLOSED do
+        task.wait(0.1)
+    end
+end
+
+-- Stop if key verification failed
+if not getgenv().SCRIPT_KEY then
+    warn("[Stats Updater] ⚠ Key verification failed or cancelled")
+    return
+end
+
+print("[Stats Updater] ✓ Key verified! Loading main script...")
+task.wait(0.5)
+
+-- ============================================================
+-- MAIN SCRIPT - Only runs after successful key verification
+-- ============================================================
+
+print("[Stats Updater DEV] ⚠️ Development build - No key system")
+print("[Stats Updater DEV] Loading script...")
+
+-- ============================================================
+-- STAT UPDATE FUNCTIONS
+-- ============================================================
+local function updateHits(amount)
+    pcall(function()
+        local args = {
+            "hitPoints",
+            player:WaitForChild("stats"):WaitForChild("hitPointBase"),
+            {
+                amount,
+                player:WaitForChild("stats"):WaitForChild("hitPointM"),
+                player:WaitForChild("stats"):WaitForChild("CASINGS_hitPointsM"),
+                2,
+                player:WaitForChild("stats"):WaitForChild("hitPointMPROMOTION"),
+                player:WaitForChild("stats"):WaitForChild("BRONZE_hitPointsM"),
+                player:WaitForChild("stats"):WaitForChild("IRON_hitPointsM"),
+                player:WaitForChild("stats"):WaitForChild("APPLES_hitPointsM"),
+                1
+            }
+        }
+        ReplicatedStorage:WaitForChild("remotes"):WaitForChild("updateStatsEvent"):FireServer(unpack(args))
+        print("[Stats Updater] Hits updated to: " .. amount)
+    end)
+end
+
+local function updateIron(amount)
+    pcall(function()
+        local args = {
+            "iron",
+            amount,
+            {
+                2,
+                player:WaitForChild("stats"):WaitForChild("ironM"),
+                player:WaitForChild("stats"):WaitForChild("CASINGS_ironM"),
+                player:WaitForChild("stats"):WaitForChild("APPLES_ironM"),
+                player:WaitForChild("stats"):WaitForChild("ironMPROMOTION"),
+                1
+            }
+        }
+        ReplicatedStorage:WaitForChild("remotes"):WaitForChild("updateStatsEvent"):FireServer(unpack(args))
+        print("[Stats Updater] Iron updated to: " .. amount)
+    end)
+end
+
+local function updateApples(amount)
+    pcall(function()
+        local args = {
+            "apples",
+            amount,
+            {
+                player:WaitForChild("stats"):WaitForChild("applesM"),
+                player:WaitForChild("stats"):WaitForChild("CASINGS_applesM"),
+                player:WaitForChild("stats"):WaitForChild("IRON_applesM"),
+                player:WaitForChild("stats"):WaitForChild("applesMPROMOTION"),
+                1
+            }
+        }
+        ReplicatedStorage:WaitForChild("remotes"):WaitForChild("updateStatsEvent"):FireServer(unpack(args))
+        print("[Stats Updater] Apples updated to: " .. amount)
+    end)
+end
+
+local function updateSteel(amount)
+    pcall(function()
+        local args = {
+            "steel",
+            amount,
+            {
+                1,
+                player:WaitForChild("stats"):WaitForChild("steelM"),
+                1,
+                player:WaitForChild("stats"):WaitForChild("IRON_steelM"),
+                player:WaitForChild("stats"):WaitForChild("steelMPROMOTION"),
+                1
+            }
+        }
+        ReplicatedStorage:WaitForChild("remotes"):WaitForChild("updateStatsEvent"):FireServer(unpack(args))
+        print("[Stats Updater] Steel updated to: " .. amount)
+    end)
+end
+
+local function updateCasings(amount)
+    pcall(function()
+        local args = {
+            "casings",
+            amount,
+            {
+                1,
+                player:WaitForChild("stats"):WaitForChild("casingsM"),
+                player:WaitForChild("stats"):WaitForChild("BRONZE_casingsM"),
+                player:WaitForChild("stats"):WaitForChild("IRON_casingsM"),
+                player:WaitForChild("stats"):WaitForChild("casingsMPROMOTION"),
+                1
+            }
+        }
+        ReplicatedStorage:WaitForChild("remotes"):WaitForChild("updateStatsEvent"):FireServer(unpack(args))
+        print("[Stats Updater] Casings updated to: " .. amount)
+    end)
+end
+
+-- ============================================================
+-- COLORS / THEME
+-- ============================================================
+local C = {
+    BG          = Color3.fromRGB(8,  16,  30),
+    TITLE_BG    = Color3.fromRGB(12, 24,  46),
+    ACCENT      = Color3.fromRGB(255, 140, 0),    -- Orange stats theme
+    ACCENT2     = Color3.fromRGB(100, 200, 255),  -- Blue accent
+    TEXT        = Color3.fromRGB(210, 235, 255),
+    SUBTEXT     = Color3.fromRGB(110, 155, 190),
+    INPUT_BG    = Color3.fromRGB(15, 25, 40),
+    BTN_FIRE    = Color3.fromRGB(255, 100, 50),
+    BORDER      = Color3.fromRGB(255, 140, 0),
+    MINIMIZE    = Color3.fromRGB(255, 180, 0),
+    DEV_WARN    = Color3.fromRGB(255, 200, 0),
+}
+
+local F  = Enum.Font.GothamBold
+local FM = Enum.Font.Gotham
+
+-- ============================================================
+-- SCREEN GUI
+-- ============================================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name             = "NVHeadMonbo_StatsUpdater"
+screenGui.ResetOnSpawn     = false
+screenGui.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder     = 99
+screenGui.Parent           = pgui
+
+-- ============================================================
+-- MAIN FRAME
+-- ============================================================
+local FRAME_W, FRAME_H = 300, 340
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name              = "Main"
+mainFrame.Size              = UDim2.new(0, FRAME_W, 0, FRAME_H)
+mainFrame.Position          = UDim2.new(0.5, -FRAME_W/2, 0, 30)
+mainFrame.BackgroundColor3  = C.BG
+mainFrame.BorderSizePixel   = 0
+mainFrame.Active            = false
+mainFrame.Draggable         = false
+mainFrame.ClipsDescendants  = true
+mainFrame.Parent            = screenGui
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+-- ============================================================
+-- RAINBOW BORDER
+-- ============================================================
+local rainbowStroke = Instance.new("UIStroke")
+rainbowStroke.Thickness = 3
+rainbowStroke.Transparency = 0
+rainbowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+rainbowStroke.Parent = mainFrame
+
+local rainbowGradient = Instance.new("UIGradient")
+rainbowGradient.Parent = rainbowStroke
+
+rainbowGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 127, 0)),
+    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
+    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 0)),
+    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 127, 255)),
+    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(139, 0, 255)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0)),
+})
+
+local rainbowRotation = 0
+RunService.Heartbeat:Connect(function(dt)
+    rainbowRotation = (rainbowRotation + dt * 40) % 360
+    rainbowGradient.Rotation = rainbowRotation
+end)
+
+-- ============================================================
+-- TITLE BAR (draggable)
+-- ============================================================
+local titleBar = Instance.new("Frame")
+titleBar.Name             = "TitleBar"
+titleBar.Size             = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = C.TITLE_BG
+titleBar.BorderSizePixel  = 0
+titleBar.ZIndex           = 2
+titleBar.Active           = true
+titleBar.Parent           = mainFrame
+
+-- Dragging logic
+local dragging, dragInput, dragStart, startPos
+
+local function updateInput(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateInput(input)
+    end
+end)
+
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12)
+local titleFill = Instance.new("Frame")
+titleFill.Size             = UDim2.new(1, 0, 0.5, 0)
+titleFill.Position         = UDim2.new(0, 0, 0.5, 0)
+titleFill.BackgroundColor3 = C.TITLE_BG
+titleFill.BorderSizePixel  = 0
+titleFill.ZIndex           = 2
+titleFill.Parent           = titleBar
+
+-- Icon
+local iconLbl = Instance.new("TextLabel")
+iconLbl.Size               = UDim2.new(0, 28, 1, 0)
+iconLbl.Position           = UDim2.new(0, 8, 0, 0)
+iconLbl.BackgroundTransparency = 1
+iconLbl.Text               = "📊"
+iconLbl.TextSize           = 18
+iconLbl.Font               = FM
+iconLbl.ZIndex             = 3
+iconLbl.Parent             = titleBar
+
+-- Title
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Size               = UDim2.new(1, -80, 1, 0)
+titleLbl.Position           = UDim2.new(0, 38, 0, 0)
+titleLbl.BackgroundTransparency = 1
+titleLbl.Text               = "Stats Updater"
+titleLbl.TextColor3         = C.ACCENT
+titleLbl.TextSize           = 12
+titleLbl.Font               = F
+titleLbl.TextXAlignment     = Enum.TextXAlignment.Left
+titleLbl.ZIndex             = 3
+titleLbl.Parent             = titleBar
+
+-- Credit
+local creditLbl = Instance.new("TextLabel")
+creditLbl.Size               = UDim2.new(1, -80, 0, 14)
+creditLbl.Position           = UDim2.new(0, 38, 1, -15)
+creditLbl.BackgroundTransparency = 1
+creditLbl.Text               = "by NVHeadMonbo"
+creditLbl.TextColor3         = C.SUBTEXT
+creditLbl.TextSize           = 9
+creditLbl.Font               = F
+creditLbl.TextXAlignment     = Enum.TextXAlignment.Left
+creditLbl.ZIndex             = 3
+creditLbl.Parent             = titleBar
+
+-- ============================================================
+-- MINIMIZE BUTTON
+-- ============================================================
+local minimized    = false
+local FULL_HEIGHT  = FRAME_H
+local MINI_HEIGHT  = 40
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size               = UDim2.new(0, 26, 0, 22)
+minimizeBtn.Position           = UDim2.new(1, -32, 0.5, -11)
+minimizeBtn.BackgroundColor3   = C.MINIMIZE
+minimizeBtn.BorderSizePixel    = 0
+minimizeBtn.Text               = "—"
+minimizeBtn.TextColor3         = Color3.fromRGB(30, 20, 0)
+minimizeBtn.TextSize           = 12
+minimizeBtn.Font               = F
+minimizeBtn.ZIndex             = 4
+minimizeBtn.Parent             = titleBar
+Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 5)
+
+-- Content container WITH SCROLLING
+local content = Instance.new("ScrollingFrame")
+content.Name              = "Content"
+content.Size              = UDim2.new(1, 0, 1, -40)
+content.Position          = UDim2.new(0, 0, 0, 40)
+content.BackgroundTransparency = 1
+content.BorderSizePixel   = 0
+content.ScrollBarThickness = 4
+content.ScrollBarImageColor3 = C.ACCENT
+content.CanvasSize        = UDim2.new(0, 0, 0, 390)  -- Increased for 5 inputs
+content.Parent            = mainFrame
+
+-- ============================================================
+-- HELPER FUNCTION TO CREATE STAT INPUTS
+-- ============================================================
+local function createStatInput(parent, labelText, yPos, defaultValue, fireCallback)
+    -- Label
+    local label = Instance.new("TextLabel")
+    label.Size               = UDim2.new(0, 80, 0, 20)
+    label.Position           = UDim2.new(0, 10, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.Text               = labelText
+    label.TextColor3         = C.TEXT
+    label.TextSize           = 11
+    label.Font               = F
+    label.TextXAlignment     = Enum.TextXAlignment.Left
+    label.Parent             = parent
+    
+    -- Input container
+    local inputContainer = Instance.new("Frame")
+    inputContainer.Size             = UDim2.new(0, 130, 0, 36)
+    inputContainer.Position         = UDim2.new(0, 10, 0, yPos + 24)
+    inputContainer.BackgroundColor3 = C.INPUT_BG
+    inputContainer.BorderSizePixel  = 0
+    inputContainer.Parent           = parent
+    Instance.new("UICorner", inputContainer).CornerRadius = UDim.new(0, 8)
+    
+    local inputStroke = Instance.new("UIStroke")
+    inputStroke.Color     = C.ACCENT2
+    inputStroke.Thickness = 1
+    inputStroke.Parent    = inputContainer
+    
+    -- TextBox
+    local textBox = Instance.new("TextBox")
+    textBox.Size               = UDim2.new(1, -16, 1, 0)
+    textBox.Position           = UDim2.new(0, 8, 0, 0)
+    textBox.BackgroundTransparency = 1
+    textBox.Text               = tostring(defaultValue)
+    textBox.PlaceholderText    = "Amount..."
+    textBox.PlaceholderColor3  = C.SUBTEXT
+    textBox.TextColor3         = C.TEXT
+    textBox.TextSize           = 13
+    textBox.Font               = FM
+    textBox.TextXAlignment     = Enum.TextXAlignment.Left
+    textBox.ClearTextOnFocus   = false
+    textBox.Parent             = inputContainer
+    
+    -- Fire button
+    local fireBtn = Instance.new("TextButton")
+    fireBtn.Size               = UDim2.new(0, 120, 0, 36)
+    fireBtn.Position           = UDim2.new(0, 150, 0, yPos + 24)
+    fireBtn.BackgroundColor3   = C.BTN_FIRE
+    fireBtn.BorderSizePixel    = 0
+    fireBtn.Text               = "🔥 FIRE"
+    fireBtn.TextColor3         = Color3.fromRGB(255, 255, 255)
+    fireBtn.TextSize           = 12
+    fireBtn.Font               = F
+    fireBtn.Parent             = parent
+    Instance.new("UICorner", fireBtn).CornerRadius = UDim.new(0, 8)
+    
+    local fireStroke = Instance.new("UIStroke")
+    fireStroke.Color     = Color3.fromRGB(200, 80, 40)
+    fireStroke.Thickness = 1
+    fireStroke.Parent    = fireBtn
+    
+    -- Fire button click
+    fireBtn.MouseButton1Click:Connect(function()
+        local value = tonumber(textBox.Text)
+        if value and value > 0 then
+            fireCallback(value)
+            
+            -- Visual feedback
+            TweenService:Create(fireBtn, TweenInfo.new(0.1), {
+                BackgroundColor3 = Color3.fromRGB(255, 150, 100)
+            }):Play()
+            task.wait(0.1)
+            TweenService:Create(fireBtn, TweenInfo.new(0.1), {
+                BackgroundColor3 = C.BTN_FIRE
+            }):Play()
+        else
+            -- Invalid input flash
+            TweenService:Create(inputStroke, TweenInfo.new(0.1), {
+                Color = Color3.fromRGB(255, 80, 80)
+            }):Play()
+            task.wait(0.2)
+            TweenService:Create(inputStroke, TweenInfo.new(0.1), {
+                Color = C.ACCENT2
+            }):Play()
+        end
+    end)
+    
+    -- Hover effects
+    fireBtn.MouseEnter:Connect(function()
+        TweenService:Create(fireBtn, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(255, 120, 70)
+        }):Play()
+    end)
+    
+    fireBtn.MouseLeave:Connect(function()
+        TweenService:Create(fireBtn, TweenInfo.new(0.15), {
+            BackgroundColor3 = C.BTN_FIRE
+        }):Play()
+    end)
+    
+    return textBox
+end
+
+-- ============================================================
+-- INFO TEXT
+-- ============================================================
+local infoLbl = Instance.new("TextLabel")
+infoLbl.Size               = UDim2.new(1, -20, 0, 32)
+infoLbl.Position           = UDim2.new(0, 10, 0, 6)
+infoLbl.BackgroundTransparency = 1
+infoLbl.Text               = "💡 Enter amount and click FIRE to update stats\nPress K to toggle UI"
+infoLbl.TextColor3         = C.SUBTEXT
+infoLbl.TextSize           = 9
+infoLbl.Font               = FM
+infoLbl.TextXAlignment     = Enum.TextXAlignment.Left
+infoLbl.TextYAlignment     = Enum.TextYAlignment.Top
+infoLbl.TextWrapped        = true
+infoLbl.Parent             = content
+
+-- ============================================================
+-- CREATE ALL STAT INPUTS
+-- ============================================================
+
+-- Hits
+createStatInput(content, "💥 Hits", 40, 9999, updateHits)
+
+-- Iron
+createStatInput(content, "⚙️ Iron", 110, 1, updateIron)
+
+-- Apples
+createStatInput(content, "🍎 Apples", 180, 1, updateApples)
+
+-- Steel
+createStatInput(content, "🔩 Steel", 250, 1, updateSteel)
+
+-- Casings
+createStatInput(content, "🔫 Casings", 320, 1, updateCasings)
+
+-- ============================================================
+-- MINIMIZE TOGGLE
+-- ============================================================
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    local targetH = minimized and MINI_HEIGHT or FULL_HEIGHT
+
+    TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
+        Size = UDim2.new(0, FRAME_W, 0, targetH)
+    }):Play()
+
+    task.delay(minimized and 0 or 0.05, function()
+        content.Visible = not minimized
+    end)
+
+    minimizeBtn.Text = minimized and "□" or "—"
+end)
+
+-- ============================================================
+-- K KEYBIND
+-- ============================================================
+local guiVisible = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        guiVisible = not guiVisible
+        mainFrame.Visible = guiVisible
+    end
+end)
+
+-- ============================================================
+-- DONE
+-- ============================================================
+print("[Stats Updater v1.0] ✓ Script loaded successfully!")
+print("[Stats Updater v1.0] Press K to toggle UI")
+
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Stats Updater";
+    Text = "v1.0 loaded! Press K to toggle UI";
+    Duration = 4;
+})
