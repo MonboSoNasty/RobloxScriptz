@@ -1,0 +1,723 @@
+-- ============================================================
+--   Auto Hit v1.0 DEV BUILD
+--   by NVHeadMonbo
+--   ⚠️ DEV BUILD - NO KEY SYSTEM (For Testing Only)
+-- ============================================================
+-- FEATURES:
+--   ✅ Auto loops through number ranges
+--   ✅ Configurable Range 1 (default: 1-20)
+--   ✅ Configurable Range 2 (default: 1-10)
+--   ✅ Adjustable fire speed
+--   ✅ Rainbow border animation
+--   ✅ K keybind = show/hide
+-- ============================================================
+
+local Players       = game:GetService("Players")
+local TweenService  = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService    = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player  = Players.LocalPlayer
+local pgui    = player:WaitForChild("PlayerGui")
+
+-- ============================================================
+-- ANTI-STACK: destroy any previous instance
+-- ============================================================
+if pgui:FindFirstChild("NVHeadMonbo_AutoHit_DEV") then
+    pgui:FindFirstChild("NVHeadMonbo_AutoHit_DEV"):Destroy()
+end
+
+print("[Auto Hit DEV] ⚠️ Development build - No key system")
+print("[Auto Hit DEV] Loading script...")
+
+-- CONFIG
+local CONFIG = {
+    Range1Min = 1,
+    Range1Max = 20,
+    Range2Min = 1,
+    Range2Max = 10,
+    FireSpeed = 0.1,    -- Delay between each hit
+    StringArg = "s242",  -- The constant string argument
+}
+
+-- Statistics
+local STATS = {
+    TotalHits = 0,
+    CurrentNum1 = 1,
+    CurrentNum2 = 1,
+    Running = false,
+}
+
+-- ============================================================
+-- AUTO HIT LOGIC
+-- ============================================================
+local running = false
+local hitThread = nil
+
+local function fireHit(num1, num2, str)
+    pcall(function()
+        local args = {num1, num2, str}
+        ReplicatedStorage:WaitForChild("Events"):WaitForChild("HitEvent"):FireServer(unpack(args))
+        STATS.TotalHits = STATS.TotalHits + 1
+    end)
+end
+
+local function startAutoHit()
+    running = true
+    STATS.Running = true
+    
+    hitThread = task.spawn(function()
+        while running do
+            local cycleHits = 0
+            
+            -- Fire ALL combinations instantly (no waits between)
+            for num1 = CONFIG.Range1Min, CONFIG.Range1Max do
+                for num2 = CONFIG.Range2Min, CONFIG.Range2Max do
+                    if not running then break end
+                    
+                    STATS.CurrentNum1 = num1
+                    STATS.CurrentNum2 = num2
+                    
+                    -- Fire with NO delay
+                    task.spawn(function()
+                        fireHit(num1, num2, CONFIG.StringArg)
+                    end)
+                    
+                    cycleHits = cycleHits + 1
+                end
+                if not running then break end
+            end
+            
+            print(string.format("[Auto Hit] Fired %d combinations instantly!", cycleHits))
+            
+            -- Wait AFTER firing all, then repeat
+            task.wait(CONFIG.FireSpeed)
+        end
+    end)
+end
+
+local function stopAutoHit()
+    running = false
+    STATS.Running = false
+    if hitThread then
+        task.cancel(hitThread)
+        hitThread = nil
+    end
+end
+
+-- ============================================================
+-- COLORS / THEME
+-- ============================================================
+local C = {
+    BG          = Color3.fromRGB(8,  16,  30),
+    TITLE_BG    = Color3.fromRGB(12, 24,  46),
+    ACCENT      = Color3.fromRGB(255, 100, 50),   -- Orange hit theme
+    ACCENT2     = Color3.fromRGB(100, 200, 255),  -- Blue accent
+    TEXT        = Color3.fromRGB(210, 235, 255),
+    SUBTEXT     = Color3.fromRGB(110, 155, 190),
+    INPUT_BG    = Color3.fromRGB(15, 25, 40),
+    BTN_ON      = Color3.fromRGB(180, 40,  60),
+    BTN_OFF     = Color3.fromRGB(0,  160, 100),
+    SLIDER_TRK  = Color3.fromRGB(20,  40,  65),
+    SLIDER_FIL  = Color3.fromRGB(255, 100, 50),
+    SLIDER_KNOB = Color3.fromRGB(255, 255, 255),
+    BORDER      = Color3.fromRGB(255, 100, 50),
+    MINIMIZE    = Color3.fromRGB(255, 180, 0),
+    DEV_WARN    = Color3.fromRGB(255, 200, 0),
+}
+
+local F  = Enum.Font.GothamBold
+local FM = Enum.Font.Gotham
+
+-- ============================================================
+-- SCREEN GUI
+-- ============================================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name             = "NVHeadMonbo_AutoHit_DEV"
+screenGui.ResetOnSpawn     = false
+screenGui.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder     = 99
+screenGui.Parent           = pgui
+
+-- ============================================================
+-- MAIN FRAME
+-- ============================================================
+local FRAME_W, FRAME_H = 320, 440
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name              = "Main"
+mainFrame.Size              = UDim2.new(0, FRAME_W, 0, FRAME_H)
+mainFrame.Position          = UDim2.new(0.5, -FRAME_W/2, 0, 30)
+mainFrame.BackgroundColor3  = C.BG
+mainFrame.BorderSizePixel   = 0
+mainFrame.Active            = false
+mainFrame.Draggable         = false
+mainFrame.ClipsDescendants  = true
+mainFrame.Parent            = screenGui
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+-- ============================================================
+-- RAINBOW BORDER
+-- ============================================================
+local rainbowStroke = Instance.new("UIStroke")
+rainbowStroke.Thickness = 3
+rainbowStroke.Transparency = 0
+rainbowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+rainbowStroke.Parent = mainFrame
+
+local rainbowGradient = Instance.new("UIGradient")
+rainbowGradient.Parent = rainbowStroke
+
+rainbowGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 127, 0)),
+    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
+    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 0)),
+    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 127, 255)),
+    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(139, 0, 255)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0)),
+})
+
+local rainbowRotation = 0
+RunService.Heartbeat:Connect(function(dt)
+    rainbowRotation = (rainbowRotation + dt * 40) % 360
+    rainbowGradient.Rotation = rainbowRotation
+end)
+
+-- ============================================================
+-- TITLE BAR (draggable)
+-- ============================================================
+local titleBar = Instance.new("Frame")
+titleBar.Name             = "TitleBar"
+titleBar.Size             = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = C.TITLE_BG
+titleBar.BorderSizePixel  = 0
+titleBar.ZIndex           = 2
+titleBar.Active           = true
+titleBar.Parent           = mainFrame
+
+-- Dragging logic
+local dragging, dragInput, dragStart, startPos
+
+local function updateInput(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateInput(input)
+    end
+end)
+
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12)
+local titleFill = Instance.new("Frame")
+titleFill.Size             = UDim2.new(1, 0, 0.5, 0)
+titleFill.Position         = UDim2.new(0, 0, 0.5, 0)
+titleFill.BackgroundColor3 = C.TITLE_BG
+titleFill.BorderSizePixel  = 0
+titleFill.ZIndex           = 2
+titleFill.Parent           = titleBar
+
+-- Icon
+local iconLbl = Instance.new("TextLabel")
+iconLbl.Size               = UDim2.new(0, 28, 1, 0)
+iconLbl.Position           = UDim2.new(0, 8, 0, 0)
+iconLbl.BackgroundTransparency = 1
+iconLbl.Text               = "💥"
+iconLbl.TextSize           = 18
+iconLbl.Font               = FM
+iconLbl.ZIndex             = 3
+iconLbl.Parent             = titleBar
+
+-- Title
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Size               = UDim2.new(1, -80, 1, 0)
+titleLbl.Position           = UDim2.new(0, 38, 0, 0)
+titleLbl.BackgroundTransparency = 1
+titleLbl.Text               = "Auto Hit"
+titleLbl.TextColor3         = C.ACCENT
+titleLbl.TextSize           = 12
+titleLbl.Font               = F
+titleLbl.TextXAlignment     = Enum.TextXAlignment.Left
+titleLbl.ZIndex             = 3
+titleLbl.Parent             = titleBar
+
+-- Credit + DEV badge
+local creditLbl = Instance.new("TextLabel")
+creditLbl.Size               = UDim2.new(1, -80, 0, 14)
+creditLbl.Position           = UDim2.new(0, 38, 1, -15)
+creditLbl.BackgroundTransparency = 1
+creditLbl.Text               = "by NVHeadMonbo • DEV"
+creditLbl.TextColor3         = C.DEV_WARN
+creditLbl.TextSize           = 9
+creditLbl.Font               = F
+creditLbl.TextXAlignment     = Enum.TextXAlignment.Left
+creditLbl.ZIndex             = 3
+creditLbl.Parent             = titleBar
+
+-- ============================================================
+-- MINIMIZE BUTTON
+-- ============================================================
+local minimized    = false
+local FULL_HEIGHT  = FRAME_H
+local MINI_HEIGHT  = 64
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size               = UDim2.new(0, 26, 0, 22)
+minimizeBtn.Position           = UDim2.new(1, -32, 0.5, -11)
+minimizeBtn.BackgroundColor3   = C.MINIMIZE
+minimizeBtn.BorderSizePixel    = 0
+minimizeBtn.Text               = "—"
+minimizeBtn.TextColor3         = Color3.fromRGB(30, 20, 0)
+minimizeBtn.TextSize           = 12
+minimizeBtn.Font               = F
+minimizeBtn.ZIndex             = 4
+minimizeBtn.Parent             = titleBar
+Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 5)
+
+-- ============================================================
+-- DEV WARNING BANNER
+-- ============================================================
+local devBanner = Instance.new("Frame")
+devBanner.Name              = "DevBanner"
+devBanner.Size              = UDim2.new(1, 0, 0, 24)
+devBanner.Position          = UDim2.new(0, 0, 0, 40)
+devBanner.BackgroundColor3  = Color3.fromRGB(40, 30, 0)
+devBanner.BorderSizePixel   = 0
+devBanner.ZIndex            = 2
+devBanner.Parent            = mainFrame
+
+local devBannerText = Instance.new("TextLabel")
+devBannerText.Size               = UDim2.new(1, 0, 1, 0)
+devBannerText.BackgroundTransparency = 1
+devBannerText.Text               = "⚠️ DEV BUILD - NO KEY SYSTEM"
+devBannerText.TextColor3         = C.DEV_WARN
+devBannerText.TextSize           = 10
+devBannerText.Font               = F
+devBannerText.TextXAlignment     = Enum.TextXAlignment.Center
+devBannerText.ZIndex             = 3
+devBannerText.Parent             = devBanner
+
+-- Content container
+local content = Instance.new("Frame")
+content.Name              = "Content"
+content.Size              = UDim2.new(1, 0, 1, -64)
+content.Position          = UDim2.new(0, 0, 0, 64)
+content.BackgroundTransparency = 1
+content.Parent            = mainFrame
+
+-- ============================================================
+-- HELPER FUNCTIONS
+-- ============================================================
+local function makeLabel(parent, text, yPos, color, size, font)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size               = UDim2.new(1, -20, 0, 20)
+    lbl.Position           = UDim2.new(0, 10, 0, yPos)
+    lbl.BackgroundTransparency = 1
+    lbl.Text               = text
+    lbl.TextColor3         = color or C.TEXT
+    lbl.TextSize           = size or 12
+    lbl.Font               = font or FM
+    lbl.TextXAlignment     = Enum.TextXAlignment.Left
+    lbl.Parent             = parent
+    return lbl
+end
+
+local function makeInput(parent, labelText, yPos, defaultValue, onChange)
+    -- Label
+    local label = Instance.new("TextLabel")
+    label.Size               = UDim2.new(0, 100, 0, 18)
+    label.Position           = UDim2.new(0, 10, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.Text               = labelText
+    label.TextColor3         = C.TEXT
+    label.TextSize           = 10
+    label.Font               = F
+    label.TextXAlignment     = Enum.TextXAlignment.Left
+    label.Parent             = parent
+    
+    -- Input
+    local inputBg = Instance.new("Frame")
+    inputBg.Size             = UDim2.new(0, 80, 0, 28)
+    inputBg.Position         = UDim2.new(1, -90, 0, yPos - 5)
+    inputBg.BackgroundColor3 = C.INPUT_BG
+    inputBg.BorderSizePixel  = 0
+    inputBg.Parent           = parent
+    Instance.new("UICorner", inputBg).CornerRadius = UDim.new(0, 6)
+    
+    local inputStroke = Instance.new("UIStroke")
+    inputStroke.Color     = C.ACCENT2
+    inputStroke.Thickness = 1
+    inputStroke.Parent    = inputBg
+    
+    local input = Instance.new("TextBox")
+    input.Size               = UDim2.new(1, -12, 1, 0)
+    input.Position           = UDim2.new(0, 6, 0, 0)
+    input.BackgroundTransparency = 1
+    input.Text               = tostring(defaultValue)
+    input.TextColor3         = C.TEXT
+    input.TextSize           = 11
+    input.Font               = FM
+    input.TextXAlignment     = Enum.TextXAlignment.Center
+    input.ClearTextOnFocus   = false
+    input.Parent             = inputBg
+    
+    input.FocusLost:Connect(function()
+        local num = tonumber(input.Text)
+        if num then
+            onChange(num)
+        else
+            input.Text = tostring(defaultValue)
+        end
+    end)
+    
+    return input
+end
+
+-- ============================================================
+-- INFO TEXT
+-- ============================================================
+local infoLbl = Instance.new("TextLabel")
+infoLbl.Size               = UDim2.new(1, -20, 0, 48)
+infoLbl.Position           = UDim2.new(0, 10, 0, 6)
+infoLbl.BackgroundTransparency = 1
+infoLbl.Text               = [[💥 Fires ALL combinations instantly, then repeats
+Example: Fire (1,1)(1,2)(2,1)(2,2)... ALL AT ONCE!
+
+Configure ranges below:]]
+infoLbl.TextColor3         = C.SUBTEXT
+infoLbl.TextSize           = 9
+infoLbl.Font               = FM
+infoLbl.TextXAlignment     = Enum.TextXAlignment.Left
+infoLbl.TextYAlignment     = Enum.TextYAlignment.Top
+infoLbl.TextWrapped        = true
+infoLbl.Parent             = content
+
+-- ============================================================
+-- STATUS DISPLAY
+-- ============================================================
+local statusLbl = makeLabel(content, "Status: Idle", 60, C.SUBTEXT, 11, FM)
+local currentLbl = makeLabel(content, "Current: (-, -)", 80, C.ACCENT, 11, FM)
+local totalLbl = makeLabel(content, "Total Hits: 0", 100, C.ACCENT2, 11, FM)
+
+-- ============================================================
+-- TOGGLE BUTTON
+-- ============================================================
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size               = UDim2.new(1, -20, 0, 38)
+toggleBtn.Position           = UDim2.new(0, 10, 0, 126)
+toggleBtn.BackgroundColor3   = C.BTN_OFF
+toggleBtn.BorderSizePixel    = 0
+toggleBtn.Text               = "▶  START AUTO HIT"
+toggleBtn.TextColor3         = Color3.fromRGB(255, 255, 255)
+toggleBtn.TextSize           = 12
+toggleBtn.Font               = F
+toggleBtn.Parent             = content
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
+
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color     = C.ACCENT
+btnStroke.Thickness = 1
+btnStroke.Parent    = toggleBtn
+
+-- Divider
+local divider = Instance.new("Frame")
+divider.Size             = UDim2.new(1, -20, 0, 1)
+divider.Position         = UDim2.new(0, 10, 0, 174)
+divider.BackgroundColor3 = Color3.fromRGB(30, 55, 85)
+divider.BorderSizePixel  = 0
+divider.Parent           = content
+
+-- ============================================================
+-- RANGE INPUTS
+-- ============================================================
+local rangeHeader = makeLabel(content, "📊 Number Ranges", 184, C.TEXT, 11, F)
+
+-- Range 1
+makeInput(content, "Range 1 Min:", 210, CONFIG.Range1Min, function(val)
+    CONFIG.Range1Min = val
+end)
+
+makeInput(content, "Range 1 Max:", 244, CONFIG.Range1Max, function(val)
+    CONFIG.Range1Max = val
+end)
+
+-- Range 2
+makeInput(content, "Range 2 Min:", 278, CONFIG.Range2Min, function(val)
+    CONFIG.Range2Min = val
+end)
+
+makeInput(content, "Range 2 Max:", 312, CONFIG.Range2Max, function(val)
+    CONFIG.Range2Max = val
+end)
+
+-- String Argument Input
+local stringHeader = makeLabel(content, "String Argument:", 278, C.TEXT, 10, F)
+
+local stringInputBg = Instance.new("Frame")
+stringInputBg.Size             = UDim2.new(0, 140, 0, 32)
+stringInputBg.Position         = UDim2.new(0, 10, 0, 300)
+stringInputBg.BackgroundColor3 = C.INPUT_BG
+stringInputBg.BorderSizePixel  = 0
+stringInputBg.Parent           = content
+Instance.new("UICorner", stringInputBg).CornerRadius = UDim.new(0, 6)
+
+local stringInputStroke = Instance.new("UIStroke")
+stringInputStroke.Color     = C.ACCENT
+stringInputStroke.Thickness = 1
+stringInputStroke.Parent    = stringInputBg
+
+local stringInput = Instance.new("TextBox")
+stringInput.Size               = UDim2.new(1, -12, 1, 0)
+stringInput.Position           = UDim2.new(0, 6, 0, 0)
+stringInput.BackgroundTransparency = 1
+stringInput.Text               = CONFIG.StringArg
+stringInput.TextColor3         = C.TEXT
+stringInput.TextSize           = 11
+stringInput.Font               = FM
+stringInput.TextXAlignment     = Enum.TextXAlignment.Left
+stringInput.ClearTextOnFocus   = false
+stringInput.Parent             = stringInputBg
+
+stringInput.FocusLost:Connect(function()
+    CONFIG.StringArg = stringInput.Text
+end)
+
+-- Divider 2
+local divider2 = Instance.new("Frame")
+divider2.Size             = UDim2.new(1, -20, 0, 1)
+divider2.Position         = UDim2.new(0, 10, 0, 342)
+divider2.BackgroundColor3 = Color3.fromRGB(30, 55, 85)
+divider2.BorderSizePixel  = 0
+divider2.Parent           = content
+
+-- ============================================================
+-- FIRE SPEED SLIDER
+-- ============================================================
+local SPEED_MIN, SPEED_MAX = 0.01, 2.0
+
+local speedHeader = makeLabel(content, "Cycle Delay (Loop Speed)", 352, C.TEXT, 10, F)
+
+local speedValLbl = Instance.new("TextLabel")
+speedValLbl.Size               = UDim2.new(0, 60, 0, 18)
+speedValLbl.Position           = UDim2.new(1, -68, 0, 352)
+speedValLbl.BackgroundTransparency = 1
+speedValLbl.Text               = "0.10s"
+speedValLbl.TextColor3         = C.ACCENT
+speedValLbl.TextSize           = 10
+speedValLbl.Font               = F
+speedValLbl.TextXAlignment     = Enum.TextXAlignment.Right
+speedValLbl.Parent             = content
+
+local speedTrack = Instance.new("Frame")
+speedTrack.Size             = UDim2.new(1, -20, 0, 6)
+speedTrack.Position         = UDim2.new(0, 10, 0, 374)
+speedTrack.BackgroundColor3 = C.SLIDER_TRK
+speedTrack.BorderSizePixel  = 0
+speedTrack.Parent           = content
+Instance.new("UICorner", speedTrack).CornerRadius = UDim.new(1, 0)
+
+local speedFill = Instance.new("Frame")
+speedFill.Size             = UDim2.new(0.045, 0, 1, 0)
+speedFill.BackgroundColor3 = C.SLIDER_FIL
+speedFill.BorderSizePixel  = 0
+speedFill.Parent           = speedTrack
+Instance.new("UICorner", speedFill).CornerRadius = UDim.new(1, 0)
+
+local speedKnob = Instance.new("Frame")
+speedKnob.Size             = UDim2.new(0, 14, 0, 14)
+speedKnob.AnchorPoint      = Vector2.new(0.5, 0.5)
+speedKnob.Position         = UDim2.new(0.045, 0, 0.5, 0)
+speedKnob.BackgroundColor3 = C.SLIDER_KNOB
+speedKnob.BorderSizePixel  = 0
+speedKnob.Parent           = speedTrack
+Instance.new("UICorner", speedKnob).CornerRadius = UDim.new(1, 0)
+
+local speedKnobStroke = Instance.new("UIStroke")
+speedKnobStroke.Color     = C.ACCENT
+speedKnobStroke.Thickness = 1.5
+speedKnobStroke.Parent    = speedKnob
+
+local draggingSpeed = false
+
+local function setSpeed(alpha)
+    alpha = math.clamp(alpha, 0, 1)
+    local value = SPEED_MIN + (SPEED_MAX - SPEED_MIN) * alpha
+    CONFIG.FireSpeed = value
+    speedFill.Size  = UDim2.new(alpha, 0, 1, 0)
+    speedKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
+    speedValLbl.Text = string.format("%.2fs", value)
+end
+
+speedTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingSpeed = true
+    end
+end)
+
+speedKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingSpeed = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingSpeed = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if draggingSpeed and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local trackPos   = speedTrack.AbsolutePosition.X
+        local trackWidth = speedTrack.AbsoluteSize.X
+        local relX       = input.Position.X - trackPos
+        local alpha      = relX / trackWidth
+        setSpeed(alpha)
+    end
+end)
+
+-- Divider 3
+local divider3 = Instance.new("Frame")
+divider3.Size             = UDim2.new(1, -20, 0, 1)
+divider3.Position         = UDim2.new(0, 10, 0, 388)
+divider3.BackgroundColor3 = Color3.fromRGB(30, 55, 85)
+divider3.BorderSizePixel  = 0
+divider3.Parent           = content
+
+-- Hint text
+local hintText = Instance.new("TextLabel")
+hintText.Size               = UDim2.new(1, -20, 0, 24)
+hintText.Position           = UDim2.new(0, 10, 0, 396)
+hintText.BackgroundTransparency = 1
+hintText.Text               = "💡 Fires ALL combinations INSTANTLY, waits, then repeats\nLower cycle delay = faster spam"
+hintText.TextColor3         = C.SUBTEXT
+hintText.TextSize           = 8
+hintText.Font               = FM
+hintText.TextXAlignment     = Enum.TextXAlignment.Left
+hintText.TextWrapped        = true
+hintText.Parent             = content
+
+-- ============================================================
+-- STATS UPDATE LOOP
+-- ============================================================
+local function updateStats()
+    task.spawn(function()
+        while true do
+            totalLbl.Text = "Total Hits: " .. STATS.TotalHits
+            
+            if STATS.Running then
+                statusLbl.Text = "Status: ✅ Running"
+                statusLbl.TextColor3 = C.ACCENT
+                currentLbl.Text = string.format("Current: (%d, %d)", STATS.CurrentNum1, STATS.CurrentNum2)
+            else
+                statusLbl.Text = "Status: Idle"
+                statusLbl.TextColor3 = C.SUBTEXT
+                currentLbl.Text = "Current: (-, -)"
+            end
+            
+            task.wait(0.05)
+        end
+    end)
+end
+
+updateStats()
+
+-- ============================================================
+-- TOGGLE BUTTON LOGIC
+-- ============================================================
+toggleBtn.MouseButton1Click:Connect(function()
+    if running then
+        stopAutoHit()
+        toggleBtn.BackgroundColor3 = C.BTN_OFF
+        btnStroke.Color            = C.ACCENT
+        toggleBtn.Text             = "▶  START AUTO HIT"
+    else
+        startAutoHit()
+        toggleBtn.BackgroundColor3 = C.BTN_ON
+        btnStroke.Color            = C.BTN_ON
+        toggleBtn.Text             = "⏹  STOP AUTO HIT"
+    end
+end)
+
+toggleBtn.MouseEnter:Connect(function()
+    TweenService:Create(toggleBtn, TweenInfo.new(0.15), {
+        BackgroundColor3 = running 
+            and Color3.fromRGB(210, 60, 80) 
+            or  Color3.fromRGB(0, 185, 115)
+    }):Play()
+end)
+
+toggleBtn.MouseLeave:Connect(function()
+    TweenService:Create(toggleBtn, TweenInfo.new(0.15), {
+        BackgroundColor3 = running and C.BTN_ON or C.BTN_OFF
+    }):Play()
+end)
+
+-- ============================================================
+-- MINIMIZE TOGGLE
+-- ============================================================
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    local targetH = minimized and MINI_HEIGHT or FULL_HEIGHT
+
+    TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
+        Size = UDim2.new(0, FRAME_W, 0, targetH)
+    }):Play()
+
+    task.delay(minimized and 0 or 0.05, function()
+        devBanner.Visible = not minimized
+        content.Visible = not minimized
+    end)
+
+    minimizeBtn.Text = minimized and "□" or "—"
+end)
+
+-- ============================================================
+-- K KEYBIND
+-- ============================================================
+local guiVisible = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        guiVisible = not guiVisible
+        mainFrame.Visible = guiVisible
+    end
+end)
+
+-- ============================================================
+-- DONE
+-- ============================================================
+print("[Auto Hit DEV] ✓ Script loaded successfully!")
+print("[Auto Hit DEV] ⚠️ This is a development build with no key system")
+print("[Auto Hit DEV] Press K to toggle UI")
+print(string.format("[Auto Hit DEV] Range 1: %d-%d | Range 2: %d-%d", CONFIG.Range1Min, CONFIG.Range1Max, CONFIG.Range2Min, CONFIG.Range2Max))
+
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Auto Hit DEV";
+    Text = "⚠️ DEV BUILD loaded! Press K to toggle";
+    Duration = 5;
+})
