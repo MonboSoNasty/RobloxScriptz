@@ -14,7 +14,23 @@ local FALLBACK_DEFAULTS = {
 	Description = "Complete verification to load this script"
 }
 
+-- ============ Module resolution ============
 local UI
+local KS
+local Config
+
+function KeyUI.SetUI(designSystem)
+	if type(designSystem) == "table" then UI = designSystem end
+end
+
+function KeyUI.SetKeySystem(ks)
+	if type(ks) == "table" then KS = ks end
+end
+
+function KeyUI.SetConfig(cfg)
+	if type(cfg) == "table" then Config = cfg end
+end
+
 local function ensureUI()
 	if UI then return UI end
 	local ok, env = pcall(getgenv)
@@ -40,6 +56,9 @@ local function getEnv()
 end
 
 local function getDurations()
+	if Config and type(Config.KeyDurations) == "table" and #Config.KeyDurations > 0 then
+		return Config.KeyDurations
+	end
 	local env = getEnv()
 	if env and env.MonboVerse and env.MonboVerse.Services and env.MonboVerse.Services.JunkieConfig then
 		local d = env.MonboVerse.Services.JunkieConfig.KeyDurations
@@ -49,6 +68,9 @@ local function getDurations()
 end
 
 local function getDefaults()
+	if Config and type(Config.Defaults) == "table" then
+		return Config.Defaults
+	end
 	local env = getEnv()
 	if env and env.MonboVerse and env.MonboVerse.Services and env.MonboVerse.Services.JunkieConfig then
 		local d = env.MonboVerse.Services.JunkieConfig.Defaults
@@ -58,6 +80,7 @@ local function getDefaults()
 end
 
 local function getKeySystem()
+	if KS then return KS end
 	local env = getEnv()
 	if env and env.MonboVerse and env.MonboVerse.Services then
 		return env.MonboVerse.Services.KeySystem
@@ -65,6 +88,7 @@ local function getKeySystem()
 	return nil
 end
 
+-- ============ Clipboard ============
 local function copyToClipboard(text)
 	local env = getEnv()
 	if env and env.MonboVerse and env.MonboVerse.Utils and type(env.MonboVerse.Utils.setClipboard) == "function" then
@@ -84,6 +108,7 @@ local function copyToClipboard(text)
 	return false
 end
 
+-- ============ State ============
 local Window = nil
 local StatusLabel = nil
 local verifyClosed = false
@@ -106,19 +131,30 @@ function KeyUI.SetStatus(msg, color)
 	end
 end
 
+-- ============ Duration select ============
 function KeyUI.ShowDurationSelect(entry, onChosen)
 	UI = ensureUI()
 	if not UI then return end
 	local C = UI.Theme
 	KeyUI.Close()
 
-	local win = UI.newWindow({ Title = "Select Duration", Subtitle = (entry and entry.Name) or "MonboVerse", Icon = "🔑", Width = 400, Height = 320, MinHeight = 44 })
+	local win = UI.newWindow({
+		Title = "Select Duration",
+		Subtitle = (entry and entry.Name) or "MonboVerse",
+		Icon = "🔑",
+		Width = 400,
+		Height = 320,
+		MinHeight = 44
+	})
 	Window = win
 	verifyClosed = false
 	local body = win.Body
 	local tracker = win.Tracker
 
-	UI.Label(body, { Name = "Prompt", Text = "Choose your key duration", TextSize = 13, Font = UI.Fonts.Bold, Position = UDim2.fromOffset(16, 12), Size = UDim2.fromOffset(220, 18) })
+	UI.Label(body, {
+		Name = "Prompt", Text = "Choose your key duration", TextSize = 13, Font = UI.Fonts.Bold,
+		Position = UDim2.fromOffset(16, 12), Size = UDim2.fromOffset(220, 18)
+	})
 
 	local durations = getDurations()
 	local selected = 1
@@ -134,7 +170,14 @@ function KeyUI.ShowDurationSelect(entry, onChosen)
 
 	local y = 46
 	for i, d in ipairs(durations) do
-		local b = UI.Button(body, { Name = "Duration_" .. i, Text = tostring(d.Name) .. "   (" .. tostring(d.Value) .. ")", TextSize = 13, Size = UDim2.new(1, -32, 0, 36), Position = UDim2.fromOffset(16, y), Color = C.SLIDER_TRK, TextColor = C.TEXT, Radius = 8 })
+		local b = UI.Button(body, {
+			Name = "Duration_" .. i,
+			Text = tostring(d.Name) .. "   (" .. tostring(d.Value) .. ")",
+			TextSize = 13,
+			Size = UDim2.new(1, -32, 0, 36),
+			Position = UDim2.fromOffset(16, y),
+			Color = C.SLIDER_TRK, TextColor = C.TEXT, Radius = 8
+		})
 		b.TextXAlignment = Enum.TextXAlignment.Center
 		table.insert(durationBtns, b)
 		tracker:track(b.MouseButton1Click:Connect(function()
@@ -144,7 +187,11 @@ function KeyUI.ShowDurationSelect(entry, onChosen)
 		y = y + 44
 	end
 
-	local cont = UI.Button(body, { Name = "Continue", Text = "Continue", TextSize = 14, Size = UDim2.fromOffset(140, 36), Position = UDim2.new(1, -16, 1, -14), AnchorPoint = Vector2.new(1, 1), Color = C.ACCENT2, TextColor = Color3.fromRGB(6, 14, 24), Radius = 8 })
+	local cont = UI.Button(body, {
+		Name = "Continue", Text = "Continue", TextSize = 14,
+		Size = UDim2.fromOffset(140, 36), Position = UDim2.new(1, -16, 1, -14), AnchorPoint = Vector2.new(1, 1),
+		Color = C.ACCENT2, TextColor = Color3.fromRGB(6, 14, 24), Radius = 8
+	})
 	tracker:track(cont.MouseButton1Click:Connect(function()
 		local chosen = durations[selected] or durations[1]
 		selectedDuration = chosen and chosen.Value or "7d"
@@ -156,6 +203,7 @@ function KeyUI.ShowDurationSelect(entry, onChosen)
 	return win
 end
 
+-- ============ Verification ============
 function KeyUI.ShowVerification(entry, onSuccess, onCancel)
 	UI = ensureUI()
 	if not UI then return end
@@ -165,12 +213,23 @@ function KeyUI.ShowVerification(entry, onSuccess, onCancel)
 	verifyClosed = false
 
 	local defaults = getDefaults()
-	local win = UI.newWindow({ Title = defaults.Title or FALLBACK_DEFAULTS.Title, Subtitle = defaults.Subtitle or FALLBACK_DEFAULTS.Subtitle, Icon = "🔑", Width = 420, Height = 380, MinHeight = 44 })
+	local win = UI.newWindow({
+		Title = defaults.Title or FALLBACK_DEFAULTS.Title,
+		Subtitle = defaults.Subtitle or FALLBACK_DEFAULTS.Subtitle,
+		Icon = "🔑",
+		Width = 420,
+		Height = 380,
+		MinHeight = 44
+	})
 	Window = win
 	local body = win.Body
 	local tracker = win.Tracker
 
-	UI.Label(body, { Name = "Description", Text = defaults.Description or FALLBACK_DEFAULTS.Description, TextSize = 12, Color = C.SUBTEXT, Wrap = true, YAlign = Enum.TextYAlignment.Top, Position = UDim2.fromOffset(20, 12), Size = UDim2.new(1, -40, 0, 36) })
+	local desc = UI.Label(body, {
+		Name = "Description", Text = defaults.Description or FALLBACK_DEFAULTS.Description,
+		TextSize = 12, Color = C.SUBTEXT, Wrap = true, YAlign = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(20, 12), Size = UDim2.new(1, -40, 0, 36)
+	})
 
 	local keyBox = Instance.new("TextBox")
 	keyBox.Name = "KeyBox"
@@ -190,13 +249,27 @@ function KeyUI.ShowVerification(entry, onSuccess, onCancel)
 	keyCorner.Parent = keyBox
 	UI.Stroke(keyBox, Color3.fromRGB(20, 45, 75), 1)
 
-	local verifyBtn = UI.Button(body, { Name = "VerifyKey", Text = "Verify Key", TextSize = 14, Size = UDim2.new(0.5, -26, 0, 38), Position = UDim2.fromOffset(20, 108), Radius = 8, Color = KC.primary, TextColor = Color3.fromRGB(255, 255, 255) })
-	local getBtn = UI.Button(body, { Name = "GetKey", Text = "Get Key", TextSize = 14, Size = UDim2.new(0.5, -26, 0, 38), Position = UDim2.new(1, -20, 0, 108), AnchorPoint = Vector2.new(1, 0), Radius = 8, Color = KC.surfaceLight, TextColor = KC.textPrimary })
+	local verifyBtn = UI.Button(body, {
+		Name = "VerifyKey", Text = "Verify Key", TextSize = 14,
+		Size = UDim2.new(0.5, -26, 0, 38), Position = UDim2.fromOffset(20, 108), Radius = 8,
+		Color = KC.primary, TextColor = Color3.fromRGB(255, 255, 255)
+	})
+	local getBtn = UI.Button(body, {
+		Name = "GetKey", Text = "Get Key", TextSize = 14,
+		Size = UDim2.new(0.5, -26, 0, 38), Position = UDim2.new(1, -20, 0, 108), AnchorPoint = Vector2.new(1, 0), Radius = 8,
+		Color = KC.surfaceLight, TextColor = KC.textPrimary
+	})
 
-	local status = UI.Label(body, { Name = "Status", Text = "", TextSize = 13, Font = UI.Fonts.Bold, Position = UDim2.fromOffset(20, 162), Size = UDim2.new(1, -40, 0, 20), XAlign = Enum.TextXAlignment.Center })
+	local status = UI.Label(body, {
+		Name = "Status", Text = "", TextSize = 13, Font = UI.Fonts.Bold,
+		Position = UDim2.fromOffset(20, 162), Size = UDim2.new(1, -40, 0, 20), XAlign = Enum.TextXAlignment.Center
+	})
 	StatusLabel = status
 
-	UI.Label(body, { Name = "Hint", Text = "No key yet? Press Get Key to open the key page.", TextSize = 11, Color = C.SUBTEXT, Position = UDim2.fromOffset(20, 196), Size = UDim2.new(1, -40, 0, 16), XAlign = Enum.TextXAlignment.Center })
+	UI.Label(body, {
+		Name = "Hint", Text = "No key yet? Press Get Key to open the key page.", TextSize = 11, Color = C.SUBTEXT,
+		Position = UDim2.fromOffset(20, 196), Size = UDim2.new(1, -40, 0, 16), XAlign = Enum.TextXAlignment.Center
+	})
 
 	KeyUI.SetStatus("Initializing Verification...", KC.textSecondary)
 	task.delay(0.5, function()
@@ -237,7 +310,7 @@ function KeyUI.ShowVerification(entry, onSuccess, onCancel)
 			task.delay(0.8, function()
 				if not verifyClosed then
 					KeyUI.Close()
-					if onSuccess then pcall(onSuccess, key) end
+					if onSuccess then pcall(onSuccess) end
 				end
 			end)
 		else
@@ -266,7 +339,10 @@ function KeyUI.ShowVerification(entry, onSuccess, onCancel)
 		end
 		local copied = copyToClipboard(link)
 		KeyUI.SetStatus(copied and "✓ Key link copied to clipboard!" or "Key link generated", KC.success)
-		UI.toast(copied and "Key link copied — open it to get your key" or "Open the key link to get your key", KC.success, 3)
+		UI.toast(
+			copied and "Key link copied — open it to get your key" or "Open the key link to get your key",
+			KC.success, 3
+		)
 	end))
 
 	return win

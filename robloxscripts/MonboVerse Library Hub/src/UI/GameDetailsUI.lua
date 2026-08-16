@@ -2,6 +2,7 @@
 
 local GameDetailsUI = {}
 
+-- ============ Module resolution ============
 local UI
 local function ensureUI()
 	if UI then return UI end
@@ -21,6 +22,10 @@ local function ensureUI()
 	return UI
 end
 
+function GameDetailsUI.SetUI(designSystem)
+	if type(designSystem) == "table" then UI = designSystem end
+end
+
 local function statusOf(entry)
 	local C = UI.Theme
 	local disabled = entry.Enabled == false or entry.Status == "disabled" or entry.Status == "Disabled"
@@ -37,6 +42,7 @@ local function badgeTextColor(c)
 	return Color3.fromRGB(255, 255, 255)
 end
 
+-- ============ Public API ============
 function GameDetailsUI.Show(entry)
 	UI = ensureUI()
 	if not UI then return end
@@ -48,7 +54,14 @@ function GameDetailsUI.Show(entry)
 	end
 
 	entry = entry or {}
-	local win = UI.newWindow({ Title = "Game Details", Subtitle = entry.Name or "Unknown Game", Icon = "🌌", Width = 460, Height = 520, MinHeight = 44 })
+	local win = UI.newWindow({
+		Title = "Game Details",
+		Subtitle = entry.Name or "Unknown Game",
+		Icon = "🌌",
+		Width = 460,
+		Height = 520,
+		MinHeight = 44
+	})
 	GameDetailsUI._Window = win
 	GameDetailsUI._UI = UI
 	local body = win.Body
@@ -56,7 +69,11 @@ function GameDetailsUI.Show(entry)
 
 	UI.toast("Loading Metadata...", C.ACCENT, 1.4)
 
-	local backBtn = UI.Button(body, { Name = "Back", Text = "← Back", TextSize = 12, Size = UDim2.fromOffset(84, 28), Position = UDim2.fromOffset(12, 10), Radius = 6, Color = C.SLIDER_TRK, TextColor = C.TEXT })
+	local backBtn = UI.Button(body, {
+		Name = "Back", Text = "← Back", TextSize = 12,
+		Size = UDim2.fromOffset(84, 28), Position = UDim2.fromOffset(12, 10), Radius = 6,
+		Color = C.SLIDER_TRK, TextColor = C.TEXT
+	})
 	tracker:track(backBtn.MouseButton1Click:Connect(function()
 		GameDetailsUI.Hide()
 	end))
@@ -76,19 +93,39 @@ function GameDetailsUI.Show(entry)
 		ic.CornerRadius = UDim.new(0, 10)
 		ic.Parent = icon
 	else
-		UI.Label(body, { Name = "Icon", Text = "🌌", TextSize = 34, Font = UI.Fonts.Bold, Position = UDim2.new(0.5, -36, 0, 56), Size = UDim2.fromOffset(72, 72), XAlign = Enum.TextXAlignment.Center })
+		UI.Label(body, {
+			Name = "Icon", Text = "🌌", TextSize = 34, Font = UI.Fonts.Bold,
+			Position = UDim2.new(0.5, -36, 0, 56), Size = UDim2.fromOffset(72, 72), XAlign = Enum.TextXAlignment.Center
+		})
 	end
 
-	UI.Label(body, { Name = "Name", Text = entry.Name or "Unknown Game", TextSize = 20, Font = UI.Fonts.Bold, Position = UDim2.new(0.5, -170, 0, 138), Size = UDim2.fromOffset(340, 26), XAlign = Enum.TextXAlignment.Center })
+	UI.Label(body, {
+		Name = "Name", Text = entry.Name or "Unknown Game", TextSize = 20, Font = UI.Fonts.Bold,
+		Position = UDim2.new(0.5, -170, 0, 138), Size = UDim2.fromOffset(340, 26), XAlign = Enum.TextXAlignment.Center
+	})
 
 	local status, sColor = statusOf(entry)
-	UI.Label(body, { Name = "VersionStatus", Text = "v" .. tostring(entry.Version or "0.0.0") .. "   ·   " .. status, TextSize = 12, Font = UI.Fonts.Bold, Color = sColor, Position = UDim2.new(0.5, -170, 0, 168), Size = UDim2.fromOffset(340, 18), XAlign = Enum.TextXAlignment.Center })
+	UI.Label(body, {
+		Name = "VersionStatus", Text = "v" .. tostring(entry.Version or "0.0.0") .. "   ·   " .. status,
+		TextSize = 12, Font = UI.Fonts.Bold, Color = sColor,
+		Position = UDim2.new(0.5, -170, 0, 168), Size = UDim2.fromOffset(340, 18), XAlign = Enum.TextXAlignment.Center
+	})
 
-	UI.Label(body, { Name = "Author", Text = "by " .. tostring(entry.Author or "Unknown"), TextSize = 12, Color = C.SUBTEXT, Position = UDim2.new(0.5, -170, 0, 190), Size = UDim2.fromOffset(340, 16), XAlign = Enum.TextXAlignment.Center })
+	UI.Label(body, {
+		Name = "Author", Text = "by " .. tostring(entry.Author or "Unknown"), TextSize = 12, Color = C.SUBTEXT,
+		Position = UDim2.new(0.5, -170, 0, 190), Size = UDim2.fromOffset(340, 16), XAlign = Enum.TextXAlignment.Center
+	})
 
-	UI.Label(body, { Name = "Description", Text = entry.Description or "No description provided.", TextSize = 12, Color = C.TEXT, Wrap = true, YAlign = Enum.TextYAlignment.Top, Position = UDim2.fromOffset(24, 216), Size = UDim2.new(1, -48, 0, 64) })
+	local desc = UI.Label(body, {
+		Name = "Description", Text = entry.Description or "No description provided.", TextSize = 12, Color = C.TEXT,
+		Wrap = true, YAlign = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(24, 216), Size = UDim2.new(1, -48, 0, 64)
+	})
 
-	UI.Label(body, { Name = "ChangelogHeader", Text = "Changelog", TextSize = 13, Font = UI.Fonts.Bold, Position = UDim2.fromOffset(24, 292), Size = UDim2.fromOffset(200, 18) })
+	UI.Label(body, {
+		Name = "ChangelogHeader", Text = "Changelog", TextSize = 13, Font = UI.Fonts.Bold,
+		Position = UDim2.fromOffset(24, 292), Size = UDim2.fromOffset(200, 18)
+	})
 	local logScroll = Instance.new("ScrollingFrame")
 	logScroll.Name = "ChangelogList"
 	logScroll.BackgroundTransparency = 1
@@ -110,7 +147,12 @@ function GameDetailsUI.Show(entry)
 	local changelog = type(entry.Changelog) == "table" and entry.Changelog or {}
 	if #changelog == 0 then changelog = { "No changelog available." } end
 	for i, line in ipairs(changelog) do
-		local l = UI.Label(logScroll, { Name = "Log" .. i, Text = "• " .. tostring(line), TextSize = 12, Color = C.SUBTEXT, Wrap = true, YAlign = Enum.TextYAlignment.Top, Size = UDim2.new(1, -8, 0, 16), LayoutOrder = i })
+		local l = UI.Label(logScroll, {
+			Name = "Log" .. i,
+			Text = "• " .. tostring(line),
+			TextSize = 12, Color = C.SUBTEXT, Wrap = true, YAlign = Enum.TextYAlignment.Top,
+			Size = UDim2.new(1, -8, 0, 16), LayoutOrder = i
+		})
 		if #tostring(line) > 52 then
 			local lines = math.ceil(#tostring(line) / 52)
 			l.Size = UDim2.new(1, -8, 0, 16 * lines)
@@ -118,7 +160,11 @@ function GameDetailsUI.Show(entry)
 	end
 	logScroll.CanvasSize = UDim2.fromOffset(0, 6 + #changelog * 20)
 
-	local loadBtn = UI.Button(body, { Name = "LoadScript", Text = "Load Script", TextSize = 15, Size = UDim2.fromOffset(220, 38), Position = UDim2.new(0.5, -110, 1, -16), AnchorPoint = Vector2.new(0.5, 1), Color = C.ACCENT, TextColor = Color3.fromRGB(6, 14, 24), Radius = 8 })
+	local loadBtn = UI.Button(body, {
+		Name = "LoadScript", Text = "Load Script", TextSize = 15,
+		Size = UDim2.fromOffset(220, 38), Position = UDim2.new(0.5, -110, 1, -16), AnchorPoint = Vector2.new(0.5, 1),
+		Color = C.ACCENT, TextColor = Color3.fromRGB(6, 14, 24), Radius = 8
+	})
 	tracker:track(loadBtn.MouseButton1Click:Connect(function()
 		UI.toast("Loading Script...", C.ACCENT2, 2)
 		if GameDetailsUI._OnLoad then pcall(GameDetailsUI._OnLoad, entry) end

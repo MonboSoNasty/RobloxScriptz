@@ -24,6 +24,16 @@ local FALLBACK_REGISTRY = {
 
 -- ============ Module resolution ============
 local UI
+local Registry
+
+function LibraryUI.SetUI(designSystem)
+	if type(designSystem) == "table" then UI = designSystem end
+end
+
+function LibraryUI.SetRegistry(reg)
+	if type(reg) == "table" then Registry = reg end
+end
+
 local function ensureUI()
 	if UI then return UI end
 	local ok, env = pcall(getgenv)
@@ -49,6 +59,7 @@ local function getEnv()
 end
 
 local function getRegistry()
+	if Registry then return Registry end
 	local env = getEnv()
 	if env and env.MonboVerse and env.MonboVerse.ScriptRegistry then
 		return env.MonboVerse.ScriptRegistry
@@ -115,7 +126,6 @@ local function buildCard(entry)
 		StrokeColor = Color3.fromRGB(20, 45, 75)
 	})
 
-	-- icon
 	local iconUrl = type(entry.Icon) == "string" and entry.Icon or nil
 	local icon
 	if iconUrl and (iconUrl:lower():find("^https?://") or iconUrl:lower():find("^rbxasset")) then
@@ -202,7 +212,6 @@ function LibraryUI.Show()
 	local body = win.Body
 	local tracker = win.Tracker
 
-	-- nav bar
 	local navBar = UI.Panel(body, {
 		Name = "NavBar", Color = C.TITLE_BG, Size = UDim2.new(1, 0, 0, 40),
 		Radius = 0, StrokeColor = Color3.fromRGB(16, 38, 66)
@@ -223,7 +232,6 @@ function LibraryUI.Show()
 		Color = C.SLIDER_TRK, TextColor = C.SUBTEXT
 	})
 
-	-- pages container
 	local pages = Instance.new("Frame")
 	pages.Name = "Pages"
 	pages.BackgroundColor3 = C.BG
@@ -232,7 +240,6 @@ function LibraryUI.Show()
 	pages.Size = UDim2.new(1, 0, 1, -40)
 	pages.Parent = body
 
-	-- Library page
 	local libPage = Instance.new("Frame")
 	libPage.Name = "LibraryPage"
 	libPage.BackgroundTransparency = 1
@@ -282,7 +289,6 @@ function LibraryUI.Show()
 	padding.PaddingRight = UDim.new(0, 12)
 	padding.Parent = scroll
 
-	-- debounced search (token-based; no Heartbeat spam)
 	local searchToken = 0
 	tracker:track(searchBox.TextChanged:Connect(function()
 		local my = searchToken + 1
@@ -297,7 +303,6 @@ function LibraryUI.Show()
 		LibraryUI.Refresh(searchBox.Text)
 	end))
 
-	-- Updates page
 	local updatesPage = Instance.new("Frame")
 	updatesPage.Name = "UpdatesPage"
 	updatesPage.BackgroundTransparency = 1
@@ -314,7 +319,6 @@ function LibraryUI.Show()
 		Position = UDim2.new(0.5, -200, 0, 100), Size = UDim2.fromOffset(400, 18), XAlign = Enum.TextXAlignment.Center
 	})
 
-	-- Settings page
 	local settingsPage = Instance.new("Frame")
 	settingsPage.Name = "SettingsPage"
 	settingsPage.BackgroundTransparency = 1
@@ -340,7 +344,6 @@ function LibraryUI.Show()
 		blurBtn.TextColor3 = blurOn and Color3.fromRGB(255, 255, 255) or C.SUBTEXT
 	end))
 
-	-- nav switching
 	local function switchPage(_, idx)
 		libPage.Visible = idx == 1
 		updatesPage.Visible = idx == 2
@@ -362,7 +365,6 @@ function LibraryUI.Refresh(query)
 	local q = tostring(query or ""):lower()
 	q = q:gsub("^%s+", ""):gsub("%s+$", "")
 
-	-- clear existing cards
 	for _, child in ipairs(LibraryUI._Scroll:GetChildren()) do
 		if child.Name == "GameCard" or child.Name == "EmptyLabel" then
 			child:Destroy()
