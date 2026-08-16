@@ -19,7 +19,7 @@ MonboVerse Library Hub/
 ├── metadata/
 │   └── MoonIncremental.json         # per-game manifest (semver, placeIds, changelog)
 ├── src/
-│   ├── Bootstrap.lua                # entry point — assembles hub, wires UI flow, plays Galaxy intro
+│   ├── Bootstrap.lua                # entry point — assembles hub, wires UI flow + K keybind, plays intro
 │   ├── Utils.lua                    # safeCall, semver, clone, clipboard, ConnectionTracker
 │   ├── Core/
 │   │   ├── Library.lua              # assembly root — exposes getgenv().MonboVerse
@@ -36,7 +36,7 @@ MonboVerse Library Hub/
 │       ├── LibraryUI.lua            # searchable game list
 │       ├── GameDetailsUI.lua        # per-game details panel
 │       ├── KeyUI.lua                # duration select + verification
-│       └── GalaxyIntro.lua          # skippable 6-phase cinematic
+│       └── GalaxyIntro.lua          # skippable 6-phase cinematic (round-circle particles)
 ├── tools/
 │   ├── validate.py                  # Lua sanity + project validation (stdlib only)
 │   └── release.py                   # deterministic minify/package pipeline (stdlib only)
@@ -86,7 +86,8 @@ MonboVerse Library Hub/
 ```
 
 `src/Bootstrap.lua` is the entry point that drives this flow: it calls
-`Library.Init()`, loads the UI modules, wires the UI callbacks, and plays
+`Library.Init()`, loads the UI modules, publishes the `getgenv().MonboVerse`
+namespaces, wires the UI callbacks, registers the `K` keybind, and plays
 `GalaxyIntro` before revealing `LibraryUI`.
 
 Module-to-module dependencies (one direction only):
@@ -104,7 +105,7 @@ Module-to-module dependencies (one direction only):
 
 | Module | Responsibility | Key functions |
 | ------ | -------------- | ------------- |
-| `Bootstrap.lua` | Entry point; wires the full UX flow | loads Library + UI, wires callbacks, plays Galaxy intro |
+| `Bootstrap.lua` | Entry point; wires the full UX flow + `K` keybind | loads Library + UI, publishes namespaces, `K` toggle/handoff, plays Galaxy intro |
 | `Utils.lua` | Safe wrappers & small helpers | `safeCall`, `semverCompare`, `isValidSemver`, `clone`, `getPlaceId`, `ConnectionTracker` |
 | `Core/Library.lua` | Assembly root; owns `getgenv().MonboVerse` | `Init`, `Select`, `LoadSelected`, `GetDetected`, `GetSelected`, `GetRegistry` |
 | `Core/GameDetector.lua` | Detect current game from PlaceId | `Detect`, `FindEntry`, `GetStatus` |
@@ -115,10 +116,10 @@ Module-to-module dependencies (one direction only):
 | `Services/GitHub.lua` | Raw repo access + updates | `RawUrl`, `FetchRaw`, `FetchJson`, `FetchRegistry`, `CheckForUpdates` |
 | `Services/Metadata.lua` | Manifests + Roblox thumbnails (cached) | `Get`, `GetGameMetaFromRoblox`, `GetGameIcon`, `ClearCache` |
 | `UI/UI.lua` | Design system (Tiny Ocean + KC palettes) | `newWindow`, `toast`, `createCard`, `setupSlider`, `setupToggle`, `nav`, `blur` |
-| `UI/LibraryUI.lua` | Library browser page | `Show`, `Refresh`, `OnSelect` |
+| `UI/LibraryUI.lua` | Library browser page | `Show`, `Hide`, `IsVisible`, `ToggleVisible`, `Refresh`, `OnSelect` |
 | `UI/GameDetailsUI.lua` | Game details panel | `Show`, `Hide`, `OnLoadRequested` |
 | `UI/KeyUI.lua` | Duration select + key verification UI | `ShowDurationSelect`, `ShowVerification`, `SetStatus`, `Close` |
-| `UI/GalaxyIntro.lua` | 6-phase cinematic | `Play`, `Skip` |
+| `UI/GalaxyIntro.lua` | 6-phase cinematic (round-circle particles) | `Play`, `Skip` |
 | `scripts/MoonIncremental.lua` | First registered game script (self-contained) | UI + Heartbeat loop + remotes, **no key code** |
 | `tools/validate.py` | Lua sanity + JSON/semver/path checks | exit 0/1 |
 | `tools/release.py` | Deterministic minify/package into `release/` | never touches sources |
@@ -138,10 +139,15 @@ Why:
 - `config/secrets.json` may override defaults at runtime but is gitignored —
   committed files contain **no real credentials**.
 
+Note: the repo is public, but the Junkie `identifier` is a **public script ID**,
+not a secret — the `loadstring` loader needs it and executor users can read it
+anyway, so it correctly stays in `JunkieConfig.lua`.
+
 ## 5. Startup / Selection / Verification Flow
 
 1. **Bootstrap** — `src/Bootstrap.lua` loads the Library, calls `Library.Init()`,
-   loads the UI modules, and wires the UI callbacks.
+   loads the UI modules, publishes `getgenv().MonboVerse.UI` (design system, with
+   submodules attached as `UI.KeyUI` etc.), and wires the UI callbacks.
 2. **Init** — `Library.Init()` loads `Utils → JunkieConfig → KeySystem → GitHub →
    Metadata`, detects the current game (`GameDetector.Detect`), and builds the
    registry.
@@ -152,7 +158,7 @@ Why:
    registry (icon, name, version, status badge, description, View / Load).
 5. **Details** — selecting a game opens `GameDetailsUI.Show(entry)` (back button,
    icon, name, version, status, author, description, changelog, **Load Script**).
-6. **Load Script** — `Library.LoadSelected()` drives
+6. **Load Script** — `Bootstrap.onLoadScript` selects the entry and calls
    `KeySystem.RequestVerification(entry)`.
 7. **Duration** — `KeyUI.ShowDurationSelect` offers the configured durations
    (1/3/7/30 days) from `JunkieConfig.KeyDurations`.
@@ -160,10 +166,16 @@ Why:
    status states: "Scanning Library..." → "Generating Key Link..." →
    "Verifying Key...").
 9. **Access granted** — `KeySystem.CheckKey` returns `valid`; `OnVerified`
-   fires; `ScriptLoader.Load(entry)` fetches the script via
-   `GitHub.FetchRaw` and runs `loadstring` + `pcall`.
+   fires; Bootstrap hides the library + details, disconnects its `K` handler,
+   and `ScriptLoader.Load(entry)` fetches the script via `GitHub.FetchRaw` and
+   runs `loadstring` + `pcall`.
 10. **Script runs** — `scripts/MoonIncremental.lua` builds its UI immediately and
     starts its Heartbeat game loop. No key code inside.
+11. **K keybind** — `Bootstrap` registers one `UserInputService` handler: while
+    the library is active, `K` toggles `LibraryUI.ToggleVisible()` (ignored while
+    a text box has focus). On verification success the handler disconnects, so the
+    loaded script owns `K` exclusively — no duplicate handlers, and the library
+    never reopens behind the script's UI.
 
 Status strings (KeyUI): "Scanning Library...", "Loading Metadata...",
 "Checking Compatibility...", "Initializing Verification...", "Generating Key
