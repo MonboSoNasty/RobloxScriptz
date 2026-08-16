@@ -1,0 +1,17 @@
+# Secrets — never commit real credentials
+config/secrets.json
+
+# Generated release output
+release/
+
+# Saved executor keys
+*.key
+
+# Python
+__pycache__/
+
+# OS junk
+.DS_Store
+
+# Logs
+*.log
