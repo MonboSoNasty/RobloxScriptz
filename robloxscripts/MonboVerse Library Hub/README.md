@@ -26,9 +26,12 @@ v2.0** — a faithful refactor of the original with the key system removed.
 
 - 🔍 **Auto-detection** — reads `game.PlaceId` and finds a matching registry entry.
 - 📚 **Library browser** — searchable game list with icons, versions, status badges.
-- 🎬 **Galaxy intro** — skippable 6-phase cinematic on startup.
+- 🎬 **Galaxy intro** — skippable 6-phase cinematic on startup (all particles are
+  round circles — no text-glyph "stars" or square nebula artifacts).
 - 🔑 **Centralized key system** — one Junkie config, one verification flow, applied
   to every game. Game scripts contain zero key code.
+- ⌨️ **K keybind** — toggles the library; after a script loads, `K` is handed off
+  to that script's UI automatically (no duplicate handlers).
 - 🧩 **Modular architecture** — Core / UI / Services modules, all pcall-guarded so a
   single failing entry never breaks the hub.
 - ✅ **Tooling** — `tools/validate.py` (Lua sanity + project checks) and
@@ -70,6 +73,14 @@ end
 
 > Note: URLs with spaces are percent-encoded (`%20`). All game scripts under
 > `scripts/` can also be run standalone — they have no key gate.
+
+## Keybinds
+
+- **K** — toggle the library window open/closed. Ignored while typing in a text
+  box (e.g. search or key input).
+- **K (after a script loads)** — the hub closes the library, disconnects its own
+  `K` handler, and hands `K` to the loaded script, so `K` toggles that script's
+  UI without reopening the library or double-firing.
 
 ## Supported Games
 
@@ -196,6 +207,7 @@ python tools/release.py           # build release/ (minified + packaged)
 | Key UI never appears | Junkie SDK URL unreachable or `secrets.json` override broken — check `config/`. |
 | "✕ Invalid Key" | Key expired/mistyped — get a new key via the **Get Key** button. |
 | Script loaded, toggles do nothing | Wrong PlaceId / remotes changed — check the game's current remotes and update the script. |
+| `K` doesn't open the library | A text box (search/key) has focus, or a script already owns `K` — click outside the box / reload the hub. |
 | `validate.py` reports unbalanced blocks | You edited a `.lua` and broke an `end` — check the reported line. |
 | Windows can't run `python` | Use `py -3 tools/validate.py` or add Python to PATH. |
 
@@ -203,6 +215,10 @@ python tools/release.py           # build release/ (minified + packaged)
 
 - No real secrets/tokens are ever committed. `config/secrets.json` is gitignored;
   commit only `config/secrets.example.json`.
+- This repository is **public**. The Junkie `identifier` in `JunkieConfig.lua` is
+  a **public script ID**, not a secret — the loader needs it and executor users
+  can read it anyway. It stays in the repo; only real credentials (e.g. a GitHub
+  PAT) belong in gitignored `config/secrets.json`.
 - No anti-cheat circumvention or evasion obfuscation — the release pipeline is
   minify/package only.
 - Every HTTP/load/verify call is wrapped in `pcall`; one failed entry never breaks
