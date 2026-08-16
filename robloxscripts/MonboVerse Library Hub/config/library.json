@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "1.0.0",
+  "repo": { "owner": "MonboSoNasty", "name": "RobloxScriptz", "branch": "main" },
+  "games": [ { "id": "moon-incremental", "name": "Moon Incremental", "placeIds": [], "script": "scripts/MoonIncremental.lua", "metadata": "metadata/MoonIncremental.json", "version": "2.0.0", "enabled": true, "status": "stable", "author": "NVHeadMonbo", "description": "Moon Incremental automation/features", "tags": ["incremental","moon","automation"], "updatedAt": "2026-08-16" } ]
+}
