@@ -22,6 +22,7 @@ local FALLBACK_REGISTRY = {
 	}
 }
 
+-- ============ Module resolution ============
 local UI
 local function ensureUI()
 	if UI then return UI end
@@ -65,9 +66,13 @@ local function getGames()
 	return {}
 end
 
+-- ============ Matching / status ============
 local function matchesQuery(entry, q)
 	if q == "" then return true end
-	local fields = { entry.Name, tostring(entry.PlaceId or ""), entry.Description, entry.Author, entry.Version, entry.Status }
+	local fields = {
+		entry.Name, tostring(entry.PlaceId or ""), entry.Description, entry.Author,
+		entry.Version, entry.Status
+	}
 	if type(entry.Tags) == "table" then
 		for _, t in ipairs(entry.Tags) do table.insert(fields, t) end
 	end
@@ -96,13 +101,21 @@ local function badgeTextColor(c)
 	return Color3.fromRGB(255, 255, 255)
 end
 
+-- ============ Card builder ============
 local function buildCard(entry)
 	local C = UI.Theme
 	local scroll = LibraryUI._Scroll
 	local tracker = LibraryUI._Window.Tracker
 
-	local card = UI.Panel(scroll, { Name = "GameCard", Color = C.CARD, Size = UDim2.new(1, 0, 0, 100), Radius = 8, StrokeColor = Color3.fromRGB(20, 45, 75) })
+	local card = UI.Panel(scroll, {
+		Name = "GameCard",
+		Color = C.CARD,
+		Size = UDim2.new(1, 0, 0, 100),
+		Radius = 8,
+		StrokeColor = Color3.fromRGB(20, 45, 75)
+	})
 
+	-- icon
 	local iconUrl = type(entry.Icon) == "string" and entry.Icon or nil
 	local icon
 	if iconUrl and (iconUrl:lower():find("^https?://") or iconUrl:lower():find("^rbxasset")) then
@@ -119,18 +132,41 @@ local function buildCard(entry)
 		ic.CornerRadius = UDim.new(0, 8)
 		ic.Parent = icon
 	else
-		icon = UI.Label(card, { Name = "Icon", Text = "🌌", TextSize = 24, Font = UI.Fonts.Bold, Position = UDim2.fromOffset(12, 12), Size = UDim2.fromOffset(48, 48), XAlign = Enum.TextXAlignment.Center })
+		icon = UI.Label(card, {
+			Name = "Icon", Text = "🌌", TextSize = 24, Font = UI.Fonts.Bold,
+			Position = UDim2.fromOffset(12, 12), Size = UDim2.fromOffset(48, 48), XAlign = Enum.TextXAlignment.Center
+		})
 	end
 
-	UI.Label(card, { Name = "Name", Text = entry.Name or "Unknown", TextSize = 15, Font = UI.Fonts.Bold, Position = UDim2.fromOffset(72, 10), Size = UDim2.new(0, 230, 0, 18), Truncate = Enum.TextTruncate.AtEnd })
-	UI.Label(card, { Name = "Version", Text = "v" .. tostring(entry.Version or "0.0.0"), TextSize = 11, Color = C.SUBTEXT, Position = UDim2.fromOffset(72, 31), Size = UDim2.fromOffset(120, 14) })
-	UI.Label(card, { Name = "Description", Text = entry.Description or "No description", TextSize = 12, Color = C.SUBTEXT, Position = UDim2.fromOffset(72, 49), Size = UDim2.new(1, -150, 0, 16), Truncate = Enum.TextTruncate.AtEnd })
+	UI.Label(card, {
+		Name = "Name", Text = entry.Name or "Unknown", TextSize = 15, Font = UI.Fonts.Bold,
+		Position = UDim2.fromOffset(72, 10), Size = UDim2.new(0, 230, 0, 18), Truncate = Enum.TextTruncate.AtEnd
+	})
+	UI.Label(card, {
+		Name = "Version", Text = "v" .. tostring(entry.Version or "0.0.0"), TextSize = 11, Color = C.SUBTEXT,
+		Position = UDim2.fromOffset(72, 31), Size = UDim2.fromOffset(120, 14)
+	})
+	UI.Label(card, {
+		Name = "Description", Text = entry.Description or "No description", TextSize = 12, Color = C.SUBTEXT,
+		Position = UDim2.fromOffset(72, 49), Size = UDim2.new(1, -150, 0, 16), Truncate = Enum.TextTruncate.AtEnd
+	})
 
 	local status, sColor = statusOf(entry)
-	UI.Badge(card, { Name = "StatusBadge", Text = status, Color = sColor, TextColor = badgeTextColor(sColor), Width = 92, Position = UDim2.new(1, -12, 0, 12), AnchorPoint = Vector2.new(1, 0) })
+	UI.Badge(card, {
+		Name = "StatusBadge", Text = status, Color = sColor, TextColor = badgeTextColor(sColor),
+		Width = 92, Position = UDim2.new(1, -12, 0, 12), AnchorPoint = Vector2.new(1, 0)
+	})
 
-	local viewBtn = UI.Button(card, { Name = "View", Text = "View", TextSize = 12, Size = UDim2.fromOffset(56, 26), Position = UDim2.new(1, -12, 1, -10), AnchorPoint = Vector2.new(1, 1), Color = C.BTN_ON, Radius = 6 })
-	local loadBtn = UI.Button(card, { Name = "Load", Text = "Load", TextSize = 12, Size = UDim2.fromOffset(56, 26), Position = UDim2.new(1, -76, 1, -10), AnchorPoint = Vector2.new(1, 1), Color = C.ACCENT, TextColor = Color3.fromRGB(6, 14, 24), Radius = 6 })
+	local viewBtn = UI.Button(card, {
+		Name = "View", Text = "View", TextSize = 12,
+		Size = UDim2.fromOffset(56, 26), Position = UDim2.new(1, -12, 1, -10), AnchorPoint = Vector2.new(1, 1),
+		Color = C.BTN_ON, Radius = 6
+	})
+	local loadBtn = UI.Button(card, {
+		Name = "Load", Text = "Load", TextSize = 12,
+		Size = UDim2.fromOffset(56, 26), Position = UDim2.new(1, -76, 1, -10), AnchorPoint = Vector2.new(1, 1),
+		Color = C.ACCENT, TextColor = Color3.fromRGB(6, 14, 24), Radius = 6
+	})
 
 	tracker:track(viewBtn.MouseButton1Click:Connect(function()
 		if LibraryUI._OnSelect then pcall(LibraryUI._OnSelect, entry, "view") end
@@ -142,6 +178,7 @@ local function buildCard(entry)
 	return card
 end
 
+-- ============ Public API ============
 function LibraryUI.Show()
 	UI = ensureUI()
 	if not UI then return end
@@ -152,17 +189,41 @@ function LibraryUI.Show()
 		LibraryUI._Window = nil
 	end
 
-	local win = UI.newWindow({ Title = "🌌 MonboVerse Library", Subtitle = "by NVHeadMonbo", Icon = "🌌", Width = 560, Height = 540, MinHeight = 44 })
+	local win = UI.newWindow({
+		Title = "🌌 MonboVerse Library",
+		Subtitle = "by NVHeadMonbo",
+		Icon = "🌌",
+		Width = 560,
+		Height = 540,
+		MinHeight = 44
+	})
 	LibraryUI._Window = win
 	LibraryUI._UI = UI
 	local body = win.Body
 	local tracker = win.Tracker
 
-	local navBar = UI.Panel(body, { Name = "NavBar", Color = C.TITLE_BG, Size = UDim2.new(1, 0, 0, 40), Radius = 0, StrokeColor = Color3.fromRGB(16, 38, 66) })
-	local libBtn = UI.Button(navBar, { Name = "NavLibrary", Text = "Library", TextSize = 12, Size = UDim2.fromOffset(104, 28), Position = UDim2.fromOffset(8, 6), Radius = 6, Color = C.SLIDER_TRK, TextColor = C.SUBTEXT })
-	local upBtn = UI.Button(navBar, { Name = "NavUpdates", Text = "Updates", TextSize = 12, Size = UDim2.fromOffset(104, 28), Position = UDim2.fromOffset(118, 6), Radius = 6, Color = C.SLIDER_TRK, TextColor = C.SUBTEXT })
-	local setBtn = UI.Button(navBar, { Name = "NavSettings", Text = "Settings", TextSize = 12, Size = UDim2.fromOffset(104, 28), Position = UDim2.fromOffset(228, 6), Radius = 6, Color = C.SLIDER_TRK, TextColor = C.SUBTEXT })
+	-- nav bar
+	local navBar = UI.Panel(body, {
+		Name = "NavBar", Color = C.TITLE_BG, Size = UDim2.new(1, 0, 0, 40),
+		Radius = 0, StrokeColor = Color3.fromRGB(16, 38, 66)
+	})
+	local libBtn = UI.Button(navBar, {
+		Name = "NavLibrary", Text = "Library", TextSize = 12,
+		Size = UDim2.fromOffset(104, 28), Position = UDim2.fromOffset(8, 6), Radius = 6,
+		Color = C.SLIDER_TRK, TextColor = C.SUBTEXT
+	})
+	local upBtn = UI.Button(navBar, {
+		Name = "NavUpdates", Text = "Updates", TextSize = 12,
+		Size = UDim2.fromOffset(104, 28), Position = UDim2.fromOffset(118, 6), Radius = 6,
+		Color = C.SLIDER_TRK, TextColor = C.SUBTEXT
+	})
+	local setBtn = UI.Button(navBar, {
+		Name = "NavSettings", Text = "Settings", TextSize = 12,
+		Size = UDim2.fromOffset(104, 28), Position = UDim2.fromOffset(228, 6), Radius = 6,
+		Color = C.SLIDER_TRK, TextColor = C.SUBTEXT
+	})
 
+	-- pages container
 	local pages = Instance.new("Frame")
 	pages.Name = "Pages"
 	pages.BackgroundColor3 = C.BG
@@ -171,6 +232,7 @@ function LibraryUI.Show()
 	pages.Size = UDim2.new(1, 0, 1, -40)
 	pages.Parent = body
 
+	-- Library page
 	local libPage = Instance.new("Frame")
 	libPage.Name = "LibraryPage"
 	libPage.BackgroundTransparency = 1
@@ -220,6 +282,7 @@ function LibraryUI.Show()
 	padding.PaddingRight = UDim.new(0, 12)
 	padding.Parent = scroll
 
+	-- debounced search (token-based; no Heartbeat spam)
 	local searchToken = 0
 	tracker:track(searchBox.TextChanged:Connect(function()
 		local my = searchToken + 1
@@ -234,6 +297,7 @@ function LibraryUI.Show()
 		LibraryUI.Refresh(searchBox.Text)
 	end))
 
+	-- Updates page
 	local updatesPage = Instance.new("Frame")
 	updatesPage.Name = "UpdatesPage"
 	updatesPage.BackgroundTransparency = 1
@@ -241,9 +305,16 @@ function LibraryUI.Show()
 	updatesPage.Size = UDim2.new(1, 0, 1, 0)
 	updatesPage.Visible = false
 	updatesPage.Parent = pages
-	UI.Label(updatesPage, { Name = "UpdatesTitle", Text = "Updates", TextSize = 20, Font = UI.Fonts.Bold, Position = UDim2.new(0.5, -80, 0, 60), Size = UDim2.fromOffset(160, 26), XAlign = Enum.TextXAlignment.Center })
-	UI.Label(updatesPage, { Name = "UpdatesNone", Text = "No updates available — all scripts are up to date.", TextSize = 12, Color = C.SUBTEXT, Position = UDim2.new(0.5, -200, 0, 100), Size = UDim2.fromOffset(400, 18), XAlign = Enum.TextXAlignment.Center })
+	UI.Label(updatesPage, {
+		Name = "UpdatesTitle", Text = "Updates", TextSize = 20, Font = UI.Fonts.Bold,
+		Position = UDim2.new(0.5, -80, 0, 60), Size = UDim2.fromOffset(160, 26), XAlign = Enum.TextXAlignment.Center
+	})
+	UI.Label(updatesPage, {
+		Name = "UpdatesNone", Text = "No updates available — all scripts are up to date.", TextSize = 12, Color = C.SUBTEXT,
+		Position = UDim2.new(0.5, -200, 0, 100), Size = UDim2.fromOffset(400, 18), XAlign = Enum.TextXAlignment.Center
+	})
 
+	-- Settings page
 	local settingsPage = Instance.new("Frame")
 	settingsPage.Name = "SettingsPage"
 	settingsPage.BackgroundTransparency = 1
@@ -251,8 +322,15 @@ function LibraryUI.Show()
 	settingsPage.Size = UDim2.new(1, 0, 1, 0)
 	settingsPage.Visible = false
 	settingsPage.Parent = pages
-	UI.Label(settingsPage, { Name = "SettingsTitle", Text = "Settings", TextSize = 20, Font = UI.Fonts.Bold, Position = UDim2.new(0.5, -80, 0, 60), Size = UDim2.fromOffset(160, 26), XAlign = Enum.TextXAlignment.Center })
-	local blurBtn = UI.Button(settingsPage, { Name = "BlurToggle", Text = "Blur: OFF", TextSize = 13, Size = UDim2.fromOffset(140, 32), Position = UDim2.new(0.5, -70, 0, 110), Radius = 8, Color = C.BTN_OFF, TextColor = C.SUBTEXT })
+	UI.Label(settingsPage, {
+		Name = "SettingsTitle", Text = "Settings", TextSize = 20, Font = UI.Fonts.Bold,
+		Position = UDim2.new(0.5, -80, 0, 60), Size = UDim2.fromOffset(160, 26), XAlign = Enum.TextXAlignment.Center
+	})
+	local blurBtn = UI.Button(settingsPage, {
+		Name = "BlurToggle", Text = "Blur: OFF", TextSize = 13,
+		Size = UDim2.fromOffset(140, 32), Position = UDim2.new(0.5, -70, 0, 110), Radius = 8,
+		Color = C.BTN_OFF, TextColor = C.SUBTEXT
+	})
 	local blurOn = false
 	tracker:track(blurBtn.MouseButton1Click:Connect(function()
 		blurOn = not blurOn
@@ -262,6 +340,7 @@ function LibraryUI.Show()
 		blurBtn.TextColor3 = blurOn and Color3.fromRGB(255, 255, 255) or C.SUBTEXT
 	end))
 
+	-- nav switching
 	local function switchPage(_, idx)
 		libPage.Visible = idx == 1
 		updatesPage.Visible = idx == 2
@@ -283,8 +362,11 @@ function LibraryUI.Refresh(query)
 	local q = tostring(query or ""):lower()
 	q = q:gsub("^%s+", ""):gsub("%s+$", "")
 
+	-- clear existing cards
 	for _, child in ipairs(LibraryUI._Scroll:GetChildren()) do
-		if child.Name == "GameCard" or child.Name == "EmptyLabel" then child:Destroy() end
+		if child.Name == "GameCard" or child.Name == "EmptyLabel" then
+			child:Destroy()
+		end
 	end
 
 	local games = getGames()
@@ -300,7 +382,12 @@ function LibraryUI.Refresh(query)
 	end
 
 	if #matches == 0 then
-		local empty = UI.Label(LibraryUI._Scroll, { Name = "EmptyLabel", Text = "No games match \"" .. tostring(query or "") .. "\"", TextSize = 13, Color = UI.Theme.SUBTEXT, Position = UDim2.fromOffset(0, 8), Size = UDim2.new(1, 0, 0, 40), XAlign = Enum.TextXAlignment.Center })
+		local empty = UI.Label(LibraryUI._Scroll, {
+			Name = "EmptyLabel",
+			Text = "No games match \"" .. tostring(query or "") .. "\"",
+			TextSize = 13, Color = UI.Theme.SUBTEXT,
+			Position = UDim2.fromOffset(0, 8), Size = UDim2.new(1, 0, 0, 40), XAlign = Enum.TextXAlignment.Center
+		})
 		empty.LayoutOrder = 1
 		LibraryUI._Scroll.CanvasSize = UDim2.fromOffset(0, 56)
 	else
@@ -310,6 +397,28 @@ end
 
 function LibraryUI.OnSelect(callback)
 	LibraryUI._OnSelect = callback
+end
+
+function LibraryUI.Hide()
+	if LibraryUI._Window then
+		local w = LibraryUI._Window
+		LibraryUI._Window = nil
+		pcall(function() w.Destroy() end)
+	end
+end
+
+function LibraryUI.IsVisible()
+	return LibraryUI._Window ~= nil
+		and LibraryUI._Window.Gui ~= nil
+		and LibraryUI._Window.Gui.Parent ~= nil
+end
+
+function LibraryUI.ToggleVisible()
+	if LibraryUI.IsVisible() then
+		LibraryUI.Hide()
+	else
+		LibraryUI.Show()
+	end
 end
 
 return LibraryUI

@@ -6,6 +6,8 @@ local REPO_NAME = "RobloxScriptz"
 local REPO_BRANCH = "main"
 local PATH_PREFIX = "robloxscripts/MonboVerse Library Hub/"
 
+local UIS = game:GetService("UserInputService")
+
 local function fetchSource(relPath)
 	local ok, raw = pcall(function()
 		local url = ("https://raw.githubusercontent.com/%s/%s/%s/%s"):format(REPO_OWNER, REPO_NAME, REPO_BRANCH, PATH_PREFIX .. relPath)
@@ -50,30 +52,80 @@ local GameDetailsUI = loadModule("src/UI/GameDetailsUI.lua")
 local KeyUI = loadModule("src/UI/KeyUI.lua")
 local GalaxyIntro = loadModule("src/UI/GalaxyIntro.lua")
 
--- 3. Publish namespaces so modules resolve each other via getgenv().MonboVerse.
-Library.UI = { UI = UI, LibraryUI = LibraryUI, GameDetailsUI = GameDetailsUI, KeyUI = KeyUI, GalaxyIntro = GalaxyIntro }
-Library.Services = { JunkieConfig = Library.JunkieConfig, KeySystem = Library.KeySystem, GitHub = Library.GitHub, Metadata = Library.Metadata }
+-- 3. Publish namespaces. IMPORTANT: getgenv().MonboVerse.UI MUST be the
+--    design-system module (that is what each UI module's ensureUI() reads for
+--    .Theme / .newWindow / .toast). Submodules are attached onto it so
+--    KeySystem/KeyUI can find them via MonboVerse.UI.KeyUI etc.
+if type(UI) == "table" then
+	UI.LibraryUI = LibraryUI
+	UI.GameDetailsUI = GameDetailsUI
+	UI.KeyUI = KeyUI
+	UI.GalaxyIntro = GalaxyIntro
+end
+Library.UI = UI
+Library.Services = {
+	JunkieConfig = Library.JunkieConfig,
+	KeySystem = Library.KeySystem,
+	GitHub = Library.GitHub,
+	Metadata = Library.Metadata,
+}
 env.MonboVerse = Library
 
--- 4. Wire the flow: browse -> details -> load script -> key verification -> script.
-if type(LibraryUI) == "table" and type(GameDetailsUI) == "table" then
+-- 4. K keybind — toggles the LIBRARY until a script is loaded; then the loaded
+--    script owns K (handler is disconnected, so no duplicate functions).
+local libraryActive = true
+local kConn = UIS.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode ~= Enum.KeyCode.K then return end
+	-- Don't toggle while the user is typing in a TextBox (search / key input).
+	if UIS.GetFocusedTextBox then
+		local ok, focused = pcall(function() return UIS:GetFocusedTextBox() end)
+		if ok and focused ~= nil then return end
+	end
+	if libraryActive and type(LibraryUI) == "table" then
+		LibraryUI.ToggleVisible()
+	end
+end)
+
+-- 5. Single verified->load path (registered once): hand K to the script, close
+--    the hub windows, then load the selected script.
+if type(Library.KeySystem) == "table" and type(Library.KeySystem.OnVerified) == "function" then
+	Library.KeySystem.OnVerified(function(entry)
+		libraryActive = false
+		pcall(function() kConn:Disconnect() end)
+		if type(LibraryUI) == "table" then pcall(LibraryUI.Hide) end
+		if type(GameDetailsUI) == "table" then pcall(GameDetailsUI.Hide) end
+		local target = entry or Library.GetSelected()
+		if type(Library.ScriptLoader) == "table" then
+			Library.ScriptLoader.Load(target)
+		end
+	end)
+end
+
+local function onLoadScript(entry)
+	Library.Select(entry)
+	if type(Library.KeySystem) == "table" and type(Library.KeySystem.RequestVerification) == "function" then
+		Library.KeySystem.RequestVerification(entry)
+	elseif type(Library.ScriptLoader) == "table" then
+		Library.ScriptLoader.Load(entry)
+	end
+end
+
+-- 6. Wire the flow: browse -> details -> load script -> key verification -> script.
+if type(LibraryUI) == "table" then
 	LibraryUI.OnSelect(function(entry, action)
 		if action == "load" then
-			Library.Select(entry)
-			Library.LoadSelected()
-		else
+			onLoadScript(entry)
+		elseif type(GameDetailsUI) == "table" then
 			GameDetailsUI.Show(entry)
 		end
 	end)
 end
 if type(GameDetailsUI) == "table" then
-	GameDetailsUI.OnLoadRequested(function(entry)
-		Library.Select(entry)
-		Library.LoadSelected()
-	end)
+	GameDetailsUI.OnLoadRequested(onLoadScript)
 end
 
--- 5. Startup cinematic -> library reveal.
+-- 7. Startup cinematic -> library reveal.
 local function start()
 	if type(LibraryUI) == "table" then
 		LibraryUI.Show()
