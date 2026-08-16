@@ -62,6 +62,14 @@ function Library.Init()
 			if okSvc and type(mod) == "table" then Library[name] = mod else warn("[MonboVerse] Service not available:", name) end
 		end
 
+		-- Publish the services namespace (UI modules resolve via getgenv().MonboVerse.Services).
+		Library.Services = {
+			JunkieConfig = Library.JunkieConfig,
+			KeySystem = Library.KeySystem,
+			GitHub = Library.GitHub,
+			Metadata = Library.Metadata,
+		}
+
 		if type(Library.KeySystem) == "table" and type(Library.KeySystem.Init) == "function" then
 			local okKs, ksErr = pcall(Library.KeySystem.Init)
 			if not okKs then warn("[MonboVerse] KeySystem.Init failed:", ksErr) end
@@ -105,12 +113,15 @@ function Library.LoadSelected()
 		if not selected then error("LoadSelected: no script selected", 0) end
 
 		if type(Library.KeySystem) == "table" and type(Library.KeySystem.RequestVerification) == "function" then
-			Library.KeySystem.RequestVerification(selected)
-			if type(Library.KeySystem.OnVerified) == "function" then
-				Library.KeySystem.OnVerified(function(entry, key)
-					return Library.ScriptLoader.Load(entry or selected)
+			-- Register the verified->load callback exactly once to avoid stale duplicate callbacks.
+			if not Library._verifWired then
+				Library._verifWired = true
+				Library.KeySystem.OnVerified(function(entry)
+					local target = entry or Library.GetSelected()
+					return Library.ScriptLoader.Load(target)
 				end)
 			end
+			Library.KeySystem.RequestVerification(selected)
 			return
 		end
 
