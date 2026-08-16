@@ -1,0 +1,12 @@
+{
+  "name": "Moon Incremental",
+  "id": "moon-incremental",
+  "author": "NVHeadMonbo",
+  "version": "2.0.0",
+  "placeIds": [],
+  "description": "Moon Incremental automation/features",
+  "status": "stable",
+  "lastUpdated": "2026-08-16",
+  "tags": ["incremental", "moon", "automation"],
+  "changelog": ["Improved UI", "Added library integration", "Centralized key system"]
+}
