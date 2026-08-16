@@ -1,4 +1,4 @@
--- MonboVerse Library Hub :: Bootstrap :: entry point — assembles the hub, wires the flow, plays the intro
+-- MonboVerse Library Hub :: Bootstrap :: entry point — teardown old instance, assemble hub, wire flow, play intro
 -- Run via: loadstring(game:HttpGet("https://raw.githubusercontent.com/MonboSoNasty/RobloxScriptz/main/robloxscripts/MonboVerse%20Library%20Hub/src/Bootstrap.lua"))()
 
 local REPO_OWNER = "MonboSoNasty"
@@ -7,6 +7,7 @@ local REPO_BRANCH = "main"
 local PATH_PREFIX = "robloxscripts/MonboVerse Library Hub/"
 
 local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 
 local function fetchSource(relPath)
 	local ok, raw = pcall(function()
@@ -30,7 +31,37 @@ end
 
 local env = getgenv and getgenv() or _G
 
--- 1. Library core (fetch if not already present).
+-- ============ 0. Teardown any previous instance (reload instead of stack) ============
+local function sweepGui(parent)
+	if not parent then return end
+	local ok, kids = pcall(function() return parent:GetChildren() end)
+	if not ok then return end
+	for _, child in ipairs(kids) do
+		if type(child) == "userdata" and type(child.Name) == "string"
+			and child.Name:sub(1, 10) == "MonboVerse" and child:IsA("GuiObject") then
+			pcall(function() child:Destroy() end)
+		end
+	end
+end
+
+local prevHub = env.MonboVerse
+if type(prevHub) == "table" then
+	if prevHub._kConn then pcall(function() prevHub._kConn:Disconnect() end) end
+	prevHub._kConn = nil
+	if type(prevHub._skipIntro) == "function" then pcall(prevHub._skipIntro) end
+	prevHub._skipIntro = nil
+end
+do
+	local okHui, hui = pcall(gethui)
+	if okHui and hui then sweepGui(hui) end
+	pcall(function() sweepGui(game:GetService("CoreGui")) end)
+	pcall(function()
+		local lp = Players.LocalPlayer
+		if lp then sweepGui(lp:WaitForChild("PlayerGui", 2)) end
+	end)
+end
+
+-- ============ 1. Library core ============
 local Library = env.MonboVerse
 if type(Library) ~= "table" or type(Library.Init) ~= "function" then
 	Library = loadModule("src/Core/Library.lua")
@@ -45,17 +76,14 @@ if not okInit then
 	warn("[MonboVerse] Bootstrap: Library.Init failed:", initErr)
 end
 
--- 2. UI modules.
+-- ============ 2. UI modules ============
 local UI = loadModule("src/UI/UI.lua")
 local LibraryUI = loadModule("src/UI/LibraryUI.lua")
 local GameDetailsUI = loadModule("src/UI/GameDetailsUI.lua")
 local KeyUI = loadModule("src/UI/KeyUI.lua")
 local GalaxyIntro = loadModule("src/UI/GalaxyIntro.lua")
 
--- 3. Publish namespaces. IMPORTANT: getgenv().MonboVerse.UI MUST be the
---    design-system module (that is what each UI module's ensureUI() reads for
---    .Theme / .newWindow / .toast). Submodules are attached onto it so
---    KeySystem/KeyUI can find them via MonboVerse.UI.KeyUI etc.
+-- ============ 3. Publish namespaces + inject dependencies (no getgenv lookup needed at render) ============
 if type(UI) == "table" then
 	UI.LibraryUI = LibraryUI
 	UI.GameDetailsUI = GameDetailsUI
@@ -71,28 +99,40 @@ Library.Services = {
 }
 env.MonboVerse = Library
 
--- 4. K keybind — toggles the LIBRARY until a script is loaded; then the loaded
---    script owns K (handler is disconnected, so no duplicate functions).
+if type(LibraryUI) == "table" then
+	if type(LibraryUI.SetUI) == "function" then LibraryUI.SetUI(UI) end
+	if type(LibraryUI.SetRegistry) == "function" then LibraryUI.SetRegistry(Library.ScriptRegistry) end
+end
+if type(GameDetailsUI) == "table" and type(GameDetailsUI.SetUI) == "function" then
+	GameDetailsUI.SetUI(UI)
+end
+if type(KeyUI) == "table" then
+	if type(KeyUI.SetUI) == "function" then KeyUI.SetUI(UI) end
+	if type(KeyUI.SetKeySystem) == "function" then KeyUI.SetKeySystem(Library.KeySystem) end
+	if type(KeyUI.SetConfig) == "function" then KeyUI.SetConfig(Library.JunkieConfig) end
+end
+
+-- ============ 4. K keybind (toggle library; hand off to script on load) ============
 local libraryActive = true
 local kConn = UIS.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode ~= Enum.KeyCode.K then return end
-	-- Don't toggle while the user is typing in a TextBox (search / key input).
 	if UIS.GetFocusedTextBox then
-		local ok, focused = pcall(function() return UIS:GetFocusedTextBox() end)
-		if ok and focused ~= nil then return end
+		local okF, focused = pcall(function() return UIS:GetFocusedTextBox() end)
+		if okF and focused ~= nil then return end
 	end
 	if libraryActive and type(LibraryUI) == "table" then
 		LibraryUI.ToggleVisible()
 	end
 end)
+Library._kConn = kConn
 
--- 5. Single verified->load path (registered once): hand K to the script, close
---    the hub windows, then load the selected script.
+-- ============ 5. Verified -> load path (registered once) ============
 if type(Library.KeySystem) == "table" and type(Library.KeySystem.OnVerified) == "function" then
 	Library.KeySystem.OnVerified(function(entry)
 		libraryActive = false
 		pcall(function() kConn:Disconnect() end)
+		Library._kConn = nil
 		if type(LibraryUI) == "table" then pcall(LibraryUI.Hide) end
 		if type(GameDetailsUI) == "table" then pcall(GameDetailsUI.Hide) end
 		local target = entry or Library.GetSelected()
@@ -111,7 +151,7 @@ local function onLoadScript(entry)
 	end
 end
 
--- 6. Wire the flow: browse -> details -> load script -> key verification -> script.
+-- ============ 6. Wire the flow: browse -> details -> load -> verify -> script ============
 if type(LibraryUI) == "table" then
 	LibraryUI.OnSelect(function(entry, action)
 		if action == "load" then
@@ -125,7 +165,7 @@ if type(GameDetailsUI) == "table" then
 	GameDetailsUI.OnLoadRequested(onLoadScript)
 end
 
--- 7. Startup cinematic -> library reveal.
+-- ============ 7. Startup cinematic -> library reveal ============
 local function start()
 	if type(LibraryUI) == "table" then
 		LibraryUI.Show()
@@ -133,6 +173,7 @@ local function start()
 end
 
 if type(GalaxyIntro) == "table" then
+	Library._skipIntro = GalaxyIntro.Skip
 	GalaxyIntro.Play(start)
 else
 	start()
